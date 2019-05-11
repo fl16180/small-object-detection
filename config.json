@@ -9,7 +9,8 @@
     "data_loader": {
         "type": "VOCDataLoader",
         "args":{
-            "data_dir": "",
+            "data_dir": "./data",
+            "image_size": 300,
             "batch_size": 128,
             "shuffle": true,
             "validation_split": 0.1,

@@ -25,4 +25,4 @@ class MnistModel(BaseModel):
 class BaseVOCModel(BaseModel):
     def __init__(self, num_classes=20):
         super(MnistModel, self).__init__()
-        self.conv1 =
+        # self.conv1 =
