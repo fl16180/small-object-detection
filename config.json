@@ -11,9 +11,9 @@
         "args":{
             "data_dir": "./data",
             "image_size": 300,
-            "batch_size": 128,
+            "batch_size": 32,
             "shuffle": true,
-            "validation_split": 0.1,
+            "validation_split": 0.0,
             "num_workers": 2
         }
     },
