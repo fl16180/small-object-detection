@@ -8,8 +8,24 @@ from itertools import product as product
 import torchvision
 
 
+"""
+Reference implementations of MultiBoxLoss at:
+
+https://github.com/amdegroot/ssd.pytorch/blob/master/layers/modules/multibox_loss.py
+
+https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection/blob/master/model.py
+
+Computing it requires helper functions to generate prior boxes, compute
+non-max suppression, and a few other things. Will need to (re-)implement these as well.
+
+"""
+
 def nll_loss(output, target):
     return F.nll_loss(output, target)
+
+
+class MultiBoxLoss(nn.Module):
+    pass
 
 
 class MultiBoxLoss(nn.Module):

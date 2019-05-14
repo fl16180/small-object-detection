@@ -12,11 +12,10 @@ class JointTransformer(object):
         corresponding bounding boxes and labels.
 
         The important steps are:
-            Resize
-
-
-        To perform data augmentation, additional steps are needed.
-        (For now I will just wrap around the file in utils/joint_transforms.py)
+            Convert bounding box pixels to percent coordinates,
+            Resize to specific image size (i.e. 300x300),
+            Mean subtract,
+            Convert image to tensor
     """
     def __init__(self, image_size, augment=False):
         self.image_size = image_size
@@ -76,7 +75,7 @@ class VOCDataLoader(BaseDataLoader):
         self.data_dir = data_dir
         self.dataset = ModVOCDetection(
                 self.data_dir,
-                year=2007,
+                year='2007',
                 image_set='train',
                 download=False,
                 joint_transform=JointTransformer(image_size))

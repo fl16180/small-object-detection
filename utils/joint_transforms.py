@@ -1,6 +1,8 @@
-""" Code from https://github.com/amdegroot/ssd.pytorch for implementing
-joint transforms (i.e. co-operations on both images and corresponding
-bounding boxes and labels). """
+""" Adapted from https://github.com/amdegroot/ssd.pytorch for implementing
+    joint transforms (i.e. co-operations on both images and corresponding
+    bounding boxes and labels). Modifications are made to suit the format
+    of our input data.
+"""
 
 import torch
 from torchvision import transforms
