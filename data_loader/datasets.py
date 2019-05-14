@@ -3,6 +3,8 @@ from torchvision import datasets
 from PIL import Image
 import xml.etree.ElementTree as ET
 
+from constants import VOC_ENCODING
+
 
 class ModVOCDetection(datasets.VOCDetection):
     """ Inherits PyTorch implementation of VOCDetection Dataset with

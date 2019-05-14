@@ -205,8 +205,9 @@ class ToCV2Image(object):
 
 
 class ToTensor(object):
-    def __call__(self, cvimage, boxes=None, labels=None):
-        return torch.from_numpy(cvimage.astype(np.float32)).permute(2, 0, 1), boxes, labels
+    """ PIL loads images in BGR so requires permute in numpy """
+    def __call__(self, image, boxes=None, labels=None):
+        return torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1), boxes, labels
 
 
 class RandomSampleCrop(object):

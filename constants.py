@@ -24,7 +24,7 @@ VOC_CLASS_NAMES = (
     'train',
     'tvmonitor',
 )
-VOC_ENCODING = {class: id for id, class in enumerate(VOC_CLASS_NAMES)}
-VOC_DECODING = {id: class for id, class in enumerate(VOC_CLASS_NAMES)}
+VOC_ENCODING = {cl: id for id, cl in enumerate(VOC_CLASS_NAMES)}
+VOC_DECODING = {id: cl for id, cl in enumerate(VOC_CLASS_NAMES)}
 
 VOC_NUM_CLASSES = 20

@@ -4,9 +4,10 @@ import numpy as np
 from constants import VOC_ENCODING
 from base import BaseDataLoader
 from utils import joint_transforms as t
+from data_loader.datasets import ModVOCDetection
 
 
-class Transformer(object):
+class JointTransformer(object):
     """ Custom transformer to jointly operate on an image and its
         corresponding bounding boxes and labels.
 
@@ -17,8 +18,9 @@ class Transformer(object):
         To perform data augmentation, additional steps are needed.
         (For now I will just wrap around the file in utils/joint_transforms.py)
     """
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
+    def __init__(self, image_size, augment=False):
+        self.image_size = image_size
+        self.augment = augment
 
     def __call__(self, image, boxes, labels):
         if self.augment is True:
@@ -26,14 +28,9 @@ class Transformer(object):
         else:
             transformer = t.Compose([
                 t.ConvertFromPIL(),
-                t.ToAbsoluteCoords(),
-                # t.PhotometricDistort(),
-                # t.Expand(self.mean),
-                # t.RandomSampleCrop(),
-                # t.RandomMirror(),
-                # t.ToPercentCoords(),
+                t.ToPercentCoords(),
                 t.Resize(self.image_size),
-                # t.SubtractMeans(self.mean),
+                t.SubtractMeans([123, 117, 104]),
                 t.ToTensor()
             ])
             return transformer(image, boxes, labels)
@@ -76,28 +73,30 @@ class VOCDataLoader(BaseDataLoader):
 
         assert split in ('train', 'trainval', 'val', 'test')
 
-        # if augment:
-        #     image_trsfm = transforms.Compose([
-        #         transforms.Resize((image_size, image_size)),
-        #         transforms.ToTensor(),
-        #         transforms.RandomCrop(200, 200),
-        #         #transforms.Normalize((0.1307,), 0.3081,))
-        #     ])
-        # else:
-        #     image_trsfm = transforms.Compose([
-        #         transforms.Resize((image_size, image_size)),
-        #         transforms.ToTensor(),
-        #         transforms.Normalize(mean=[0.485, 0.456, 0.406],
-        #                              std=[0.229, 0.224, 0.225])
-        #     ])
-
         self.data_dir = data_dir
-        self.dataset = ModVOCDetection(self.data_dir,
-                                       year='2007',
-                                       image_set='train',
-                                       download=False,
-                                       joint_transform=im_box_transformer)
+        self.dataset = ModVOCDetection(
+                self.data_dir,
+                year=2007,
+                image_set='train',
+                download=False,
+                joint_transform=JointTransformer(image_size))
 
         super(VOCDataLoader, self).__init__(self.dataset, batch_size,
                                             shuffle, validation_split,
                                             num_workers, collate_fn)
+
+
+# if augment:
+#     image_trsfm = transforms.Compose([
+#         transforms.Resize((image_size, image_size)),
+#         transforms.ToTensor(),
+#         transforms.RandomCrop(200, 200),
+#         #transforms.Normalize((0.1307,), 0.3081,))
+#     ])
+# else:
+#     image_trsfm = transforms.Compose([
+#         transforms.Resize((image_size, image_size)),
+#         transforms.ToTensor(),
+#         transforms.Normalize(mean=[0.485, 0.456, 0.406],
+#                              std=[0.229, 0.224, 0.225])
+#     ])
