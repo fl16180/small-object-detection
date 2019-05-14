@@ -54,9 +54,13 @@ class Trainer(BaseTrainer):
             labels = [l.to(self.device) for l in labels]
 
             self.optimizer.zero_grad()
-            output = self.model(data)
-            loss = self.loss(output, boxes, labels)
+            output_boxes, output_scores = self.model(data)
+            loss = self.loss(output_boxes, output_scores, boxes, labels)
             loss.backward()
+
+            # # potentially clip gradients First
+            # if grad_clip is not None:
+            #     clip_gradient(optimizer, grad_clip)
             self.optimizer.step()
 
             self.writer.set_step((epoch - 1) * len(self.data_loader) + batch_idx)
@@ -100,11 +104,13 @@ class Trainer(BaseTrainer):
         total_val_loss = 0
         total_val_metrics = np.zeros(len(self.metrics))
         with torch.no_grad():
-            for batch_idx, (data, target) in enumerate(self.valid_data_loader):
-                data, target = data.to(self.device), target.to(self.device)
+            for batch_idx, (data, boxes, labels) in enumerate(self.valid_data_loader):
+                data = data.to(self.device)
+                boxes = [b.to(self.device) for b in boxes]
+                labels = [l.to(self.device) for l in labels]
 
-                output = self.model(data)
-                loss = self.loss(output, target)
+                output_boxes, output_scores = self.model(data)
+                loss = self.loss(output_boxes, output_scores, boxes, labels)
 
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
                 self.writer.add_scalar('loss', loss.item())
