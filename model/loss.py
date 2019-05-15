@@ -7,6 +7,10 @@ from math import sqrt
 from itertools import product as product
 import torchvision
 
+from utils import cxcy_to_gcxgcy, cxcy_to_xy, xy_to_cxcy, gcxgcy_to_cxcy
+from utils import get_default_boxes, find_jaccard_overlap
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 """
 Reference implementations of MultiBoxLoss at:
@@ -23,114 +27,114 @@ non-max suppression, and a few other things. Will need to (re-)implement these a
 def nll_loss(output, target):
     return F.nll_loss(output, target)
 
-### VERSION 1
-class MultiBoxLoss(nn.Module):
-    """SSD Weighted Loss Function
-    Compute Targets:
-        1) Produce Confidence Target Indices by matching  ground truth boxes
-           with (default) 'priorboxes' that have jaccard index > threshold parameter
-           (default threshold: 0.5).
-        2) Produce localization target by 'encoding' variance into offsets of ground
-           truth boxes and their matched  'priorboxes'.
-        3) Hard negative mining to filter the excessive number of negative examples
-           that comes with using a large number of default bounding boxes.
-           (default negative:positive ratio 3:1)
-    Objective Loss:
-        L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
-        Where, Lconf is the CrossEntropy Loss and Lloc is the SmoothL1 Loss
-        weighted by α which is set to 1 by cross val.
-        Args:
-            c: class confidences,
-            l: predicted boxes,
-            g: ground truth boxes
-            N: number of matched default boxes
-        See: https://arxiv.org/pdf/1512.02325.pdf for more details.
-    """
-
-    def __init__(self, num_classes, overlap_thresh, prior_for_matching,
-                 bkg_label, neg_mining, neg_pos, neg_overlap, encode_target,
-                 use_gpu=True):
-        super(MultiBoxLoss, self).__init__()
-        self.use_gpu = use_gpu
-        self.num_classes = num_classes
-        self.threshold = overlap_thresh
-        self.background_label = bkg_label
-        self.encode_target = encode_target
-        self.use_prior_for_matching = prior_for_matching
-        self.do_neg_mining = neg_mining
-        self.negpos_ratio = neg_pos
-        self.neg_overlap = neg_overlap
-        self.variance = cfg['variance']
-
-    def forward(self, predictions, targets):
-        """Multibox Loss
-        Args:
-            predictions (tuple): A tuple containing loc preds, conf preds,
-            and prior boxes from SSD net.
-                conf shape: torch.size(batch_size,num_priors,num_classes)
-                loc shape: torch.size(batch_size,num_priors,4)
-                priors shape: torch.size(num_priors,4)
-            targets (tensor): Ground truth boxes and labels for a batch,
-                shape: [batch_size,num_objs,5] (last idx is the label).
-        """
-        loc_data, conf_data, priors = predictions
-        num = loc_data.size(0)
-        priors = priors[:loc_data.size(1), :]
-        num_priors = (priors.size(0))
-        num_classes = self.num_classes
-
-        # match priors (default boxes) and ground truth boxes
-        loc_t = torch.Tensor(num, num_priors, 4)
-        conf_t = torch.LongTensor(num, num_priors)
-        for idx in range(num):
-            truths = targets[idx][:, :-1].data
-            labels = targets[idx][:, -1].data
-            defaults = priors.data
-            match(self.threshold, truths, defaults, self.variance, labels,
-                  loc_t, conf_t, idx)
-        if self.use_gpu:
-            loc_t = loc_t.cuda()
-            conf_t = conf_t.cuda()
-        # wrap targets
-        loc_t = Variable(loc_t, requires_grad=False)
-        conf_t = Variable(conf_t, requires_grad=False)
-
-        pos = conf_t > 0
-        num_pos = pos.sum(dim=1, keepdim=True)
-
-        # Localization Loss (Smooth L1)
-        # Shape: [batch,num_priors,4]
-        pos_idx = pos.unsqueeze(pos.dim()).expand_as(loc_data)
-        loc_p = loc_data[pos_idx].view(-1, 4)
-        loc_t = loc_t[pos_idx].view(-1, 4)
-        loss_l = F.smooth_l1_loss(loc_p, loc_t, size_average=False)
-
-        # Compute max conf across batch for hard negative mining
-        batch_conf = conf_data.view(-1, self.num_classes)
-        loss_c = log_sum_exp(batch_conf) - batch_conf.gather(1, conf_t.view(-1, 1))
-
-        # Hard Negative Mining
-        loss_c[pos] = 0  # filter out pos boxes for now
-        loss_c = loss_c.view(num, -1)
-        _, loss_idx = loss_c.sort(1, descending=True)
-        _, idx_rank = loss_idx.sort(1)
-        num_pos = pos.long().sum(1, keepdim=True)
-        num_neg = torch.clamp(self.negpos_ratio*num_pos, max=pos.size(1)-1)
-        neg = idx_rank < num_neg.expand_as(idx_rank)
-
-        # Confidence Loss Including Positive and Negative Examples
-        pos_idx = pos.unsqueeze(2).expand_as(conf_data)
-        neg_idx = neg.unsqueeze(2).expand_as(conf_data)
-        conf_p = conf_data[(pos_idx+neg_idx).gt(0)].view(-1, self.num_classes)
-        targets_weighted = conf_t[(pos+neg).gt(0)]
-        loss_c = F.cross_entropy(conf_p, targets_weighted, size_average=False)
-
-        # Sum of losses: L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
-
-        N = num_pos.data.sum()
-        loss_l /= N
-        loss_c /= N
-        return loss_l, loss_c
+# ### VERSION 1
+# class MultiBoxLoss(nn.Module):
+#     """SSD Weighted Loss Function
+#     Compute Targets:
+#         1) Produce Confidence Target Indices by matching  ground truth boxes
+#            with (default) 'priorboxes' that have jaccard index > threshold parameter
+#            (default threshold: 0.5).
+#         2) Produce localization target by 'encoding' variance into offsets of ground
+#            truth boxes and their matched  'priorboxes'.
+#         3) Hard negative mining to filter the excessive number of negative examples
+#            that comes with using a large number of default bounding boxes.
+#            (default negative:positive ratio 3:1)
+#     Objective Loss:
+#         L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
+#         Where, Lconf is the CrossEntropy Loss and Lloc is the SmoothL1 Loss
+#         weighted by α which is set to 1 by cross val.
+#         Args:
+#             c: class confidences,
+#             l: predicted boxes,
+#             g: ground truth boxes
+#             N: number of matched default boxes
+#         See: https://arxiv.org/pdf/1512.02325.pdf for more details.
+#     """
+#
+#     def __init__(self, num_classes, overlap_thresh, prior_for_matching,
+#                  bkg_label, neg_mining, neg_pos, neg_overlap, encode_target,
+#                  use_gpu=True):
+#         super(MultiBoxLoss, self).__init__()
+#         self.use_gpu = use_gpu
+#         self.num_classes = num_classes
+#         self.threshold = overlap_thresh
+#         self.background_label = bkg_label
+#         self.encode_target = encode_target
+#         self.use_prior_for_matching = prior_for_matching
+#         self.do_neg_mining = neg_mining
+#         self.negpos_ratio = neg_pos
+#         self.neg_overlap = neg_overlap
+#         self.variance = cfg['variance']
+#
+#     def forward(self, predictions, targets):
+#         """Multibox Loss
+#         Args:
+#             predictions (tuple): A tuple containing loc preds, conf preds,
+#             and prior boxes from SSD net.
+#                 conf shape: torch.size(batch_size,num_priors,num_classes)
+#                 loc shape: torch.size(batch_size,num_priors,4)
+#                 priors shape: torch.size(num_priors,4)
+#             targets (tensor): Ground truth boxes and labels for a batch,
+#                 shape: [batch_size,num_objs,5] (last idx is the label).
+#         """
+#         loc_data, conf_data, priors = predictions
+#         num = loc_data.size(0)
+#         priors = priors[:loc_data.size(1), :]
+#         num_priors = (priors.size(0))
+#         num_classes = self.num_classes
+#
+#         # match priors (default boxes) and ground truth boxes
+#         loc_t = torch.Tensor(num, num_priors, 4)
+#         conf_t = torch.LongTensor(num, num_priors)
+#         for idx in range(num):
+#             truths = targets[idx][:, :-1].data
+#             labels = targets[idx][:, -1].data
+#             defaults = priors.data
+#             match(self.threshold, truths, defaults, self.variance, labels,
+#                   loc_t, conf_t, idx)
+#         if self.use_gpu:
+#             loc_t = loc_t.cuda()
+#             conf_t = conf_t.cuda()
+#         # wrap targets
+#         loc_t = Variable(loc_t, requires_grad=False)
+#         conf_t = Variable(conf_t, requires_grad=False)
+#
+#         pos = conf_t > 0
+#         num_pos = pos.sum(dim=1, keepdim=True)
+#
+#         # Localization Loss (Smooth L1)
+#         # Shape: [batch,num_priors,4]
+#         pos_idx = pos.unsqueeze(pos.dim()).expand_as(loc_data)
+#         loc_p = loc_data[pos_idx].view(-1, 4)
+#         loc_t = loc_t[pos_idx].view(-1, 4)
+#         loss_l = F.smooth_l1_loss(loc_p, loc_t, size_average=False)
+#
+#         # Compute max conf across batch for hard negative mining
+#         batch_conf = conf_data.view(-1, self.num_classes)
+#         loss_c = log_sum_exp(batch_conf) - batch_conf.gather(1, conf_t.view(-1, 1))
+#
+#         # Hard Negative Mining
+#         loss_c[pos] = 0  # filter out pos boxes for now
+#         loss_c = loss_c.view(num, -1)
+#         _, loss_idx = loss_c.sort(1, descending=True)
+#         _, idx_rank = loss_idx.sort(1)
+#         num_pos = pos.long().sum(1, keepdim=True)
+#         num_neg = torch.clamp(self.negpos_ratio*num_pos, max=pos.size(1)-1)
+#         neg = idx_rank < num_neg.expand_as(idx_rank)
+#
+#         # Confidence Loss Including Positive and Negative Examples
+#         pos_idx = pos.unsqueeze(2).expand_as(conf_data)
+#         neg_idx = neg.unsqueeze(2).expand_as(conf_data)
+#         conf_p = conf_data[(pos_idx+neg_idx).gt(0)].view(-1, self.num_classes)
+#         targets_weighted = conf_t[(pos+neg).gt(0)]
+#         loss_c = F.cross_entropy(conf_p, targets_weighted, size_average=False)
+#
+#         # Sum of losses: L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
+#
+#         N = num_pos.data.sum()
+#         loss_l /= N
+#         loss_c /= N
+#         return loss_l, loss_c
 
 
 ### VERSION 2
@@ -142,10 +146,10 @@ class MultiBoxLoss(nn.Module):
     (2) a confidence loss for the predicted class scores.
     """
 
-    def __init__(self, priors_cxcy, threshold=0.5, neg_pos_ratio=3, alpha=1.):
+    def __init__(self, threshold=0.5, neg_pos_ratio=3, alpha=1.):
         super(MultiBoxLoss, self).__init__()
-        self.priors_cxcy = priors_cxcy
-        self.priors_xy = cxcy_to_xy(priors_cxcy)
+        self.priors_cxcy = get_default_boxes()
+        self.priors_xy = cxcy_to_xy(self.priors_cxcy)
         self.threshold = threshold
         self.neg_pos_ratio = neg_pos_ratio
         self.alpha = alpha
@@ -250,55 +254,3 @@ class MultiBoxLoss(nn.Module):
         # TOTAL LOSS
 
         return conf_loss + self.alpha * loc_loss
-
-
-def xy_to_cxcy(xy):
-    """
-    Convert bounding boxes from boundary coordinates (x_min, y_min, x_max, y_max) to center-size coordinates (c_x, c_y, w, h).
-    :param xy: bounding boxes in boundary coordinates, a tensor of size (n_boxes, 4)
-    :return: bounding boxes in center-size coordinates, a tensor of size (n_boxes, 4)
-    """
-    return torch.cat([(xy[:, 2:] + xy[:, :2]) / 2,  # c_x, c_y
-                      xy[:, 2:] - xy[:, :2]], 1)  # w, h
-
-
-def cxcy_to_xy(cxcy):
-    """
-    Convert bounding boxes from center-size coordinates (c_x, c_y, w, h) to boundary coordinates (x_min, y_min, x_max, y_max).
-    :param cxcy: bounding boxes in center-size coordinates, a tensor of size (n_boxes, 4)
-    :return: bounding boxes in boundary coordinates, a tensor of size (n_boxes, 4)
-    """
-    return torch.cat([cxcy[:, :2] - (cxcy[:, 2:] / 2),  # x_min, y_min
-                      cxcy[:, :2] + (cxcy[:, 2:] / 2)], 1)  # x_max, y_max
-
-
-def cxcy_to_gcxgcy(cxcy, priors_cxcy):
-    """
-    Encode bounding boxes (that are in center-size form) w.r.t. the corresponding prior boxes (that are in center-size form).
-    For the center coordinates, find the offset with respect to the prior box, and scale by the size of the prior box.
-    For the size coordinates, scale by the size of the prior box, and convert to the log-space.
-    In the model, we are predicting bounding box coordinates in this encoded form.
-    :param cxcy: bounding boxes in center-size coordinates, a tensor of size (n_priors, 4)
-    :param priors_cxcy: prior boxes with respect to which the encoding must be performed, a tensor of size (n_priors, 4)
-    :return: encoded bounding boxes, a tensor of size (n_priors, 4)
-    """
-
-    # The 10 and 5 below are referred to as 'variances' in the original Caffe repo, completely empirical
-    # They are for some sort of numerical conditioning, for 'scaling the localization gradient'
-    # See https://github.com/weiliu89/caffe/issues/155
-    return torch.cat([(cxcy[:, :2] - priors_cxcy[:, :2]) / (priors_cxcy[:, 2:] / 10),  # g_c_x, g_c_y
-                      torch.log(cxcy[:, 2:] / priors_cxcy[:, 2:]) * 5], 1)  # g_w, g_h
-
-
-def gcxgcy_to_cxcy(gcxgcy, priors_cxcy):
-    """
-    Decode bounding box coordinates predicted by the model, since they are encoded in the form mentioned above.
-    They are decoded into center-size coordinates.
-    This is the inverse of the function above.
-    :param gcxgcy: encoded bounding boxes, i.e. output of the model, a tensor of size (n_priors, 4)
-    :param priors_cxcy: prior boxes with respect to which the encoding is defined, a tensor of size (n_priors, 4)
-    :return: decoded bounding boxes in center-size form, a tensor of size (n_priors, 4)
-    """
-
-    return torch.cat([gcxgcy[:, :2] * priors_cxcy[:, 2:] / 10 + priors_cxcy[:, :2],  # c_x, c_y
-                      torch.exp(gcxgcy[:, 2:] / 5) * priors_cxcy[:, 2:]], 1)  # w, h

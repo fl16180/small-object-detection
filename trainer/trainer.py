@@ -20,6 +20,7 @@ class Trainer(BaseTrainer):
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.batch_size))
+        self.multiboxloss = loss(threshold=0.5, neg_pos_ratio=3, alpha=1.)
 
     def _eval_metrics(self, output, target):
         acc_metrics = np.zeros(len(self.metrics))
@@ -55,7 +56,8 @@ class Trainer(BaseTrainer):
 
             self.optimizer.zero_grad()
             output_boxes, output_scores = self.model(data)
-            loss = self.loss(output_boxes, output_scores, boxes, labels)
+
+            loss = self.multiboxloss(output_boxes, output_scores, boxes, labels)
             loss.backward()
 
             # # potentially clip gradients First
@@ -66,7 +68,8 @@ class Trainer(BaseTrainer):
             self.writer.set_step((epoch - 1) * len(self.data_loader) + batch_idx)
             self.writer.add_scalar('loss', loss.item())
             total_loss += loss.item()
-            total_metrics += self._eval_metrics(output, boxes, labels)
+            ### TODO: IMPLEMENT MAP METRIC
+            # total_metrics += self._eval_metrics(output_boxes, output_scores, boxes, labels)
 
             if batch_idx % self.log_step == 0:
                 self.logger.debug('Train Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}'.format(
@@ -110,7 +113,8 @@ class Trainer(BaseTrainer):
                 labels = [l.to(self.device) for l in labels]
 
                 output_boxes, output_scores = self.model(data)
-                loss = self.loss(output_boxes, output_scores, boxes, labels)
+
+                loss = self.multiboxloss(output_boxes, output_scores, boxes, labels)
 
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
                 self.writer.add_scalar('loss', loss.item())

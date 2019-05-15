@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torchvision.models import vgg16
 
 from base import BaseModel
-from utils import decimate
+from utils import *
 
 from math import sqrt
 from itertools import product as product
@@ -165,7 +165,7 @@ class ExtraLayers(nn.Module):
 
 class Classifiers(nn.Module):
 
-    def __init__(self, n_classes, n_boxes=(4, 6, 6, 6, 4, 4)):
+    def __init__(self, n_classes, n_boxes):
         super(Classifiers, self).__init__()
 
         self.n_classes = n_classes
@@ -200,7 +200,7 @@ class Classifiers(nn.Module):
 
         N = conv4_out.size(0)
 
-        # swap dimensions around and enforce contiguous in memory
+        # swap dimensions around and reassign in natural layout (contiguous)
         box4 = self.box4(conv4_out).permute(0, 2, 3, 1).contiguous()
         box7 = self.box7(conv7_out).permute(0, 2, 3, 1).contiguous()
         box8 = self.box8(conv8_out).permute(0, 2, 3, 1).contiguous()
@@ -248,22 +248,22 @@ class SSD300(nn.Module):
                 feature set.
     """
 
-    def __init__(self, n_classes):
+    def __init__(self, n_classes, n_boxes=(4, 6, 6, 6, 4, 4)):
         super(SSD300, self).__init__()
 
         self.n_classes = n_classes
+        self.n_boxes = n_boxes
 
         self.base = VGG16()
         self.extra = ExtraLayers()
-        self.classifiers = Classifiers(n_classes)
+        self.classifiers = Classifiers(n_classes, n_boxes)
 
-        # Since lower level features (conv4_3_feats) have considerably larger scales, we take the L2 norm and rescale
-        # Rescale factor is initially set at 20, but is learned for each channel during back-prop
+        # L2 norm scaler for conv4_out. Updated thru backprop
         self.rescale_factors = nn.Parameter(torch.FloatTensor(1, 512, 1, 1))  # there are 512 channels in conv4_3_feats
         nn.init.constant_(self.rescale_factors, 20)
 
-        # Prior boxes
-        self.priors_cxcy = self.create_prior_boxes()
+        # default boxes
+        self.priors = get_default_boxes()
 
     def forward(self, image):
         """ Forward propagation.
@@ -296,62 +296,10 @@ class SSD300(nn.Module):
         out = torch.div(out, norm)
         return out * self.rescale_factors
 
-    def create_prior_boxes(self):
-        """
-        Create the 8732 prior (default) boxes for the SSD300, as defined in the paper.
-        :return: prior boxes in center-size coordinates, a tensor of dimensions (8732, 4)
-        """
-        fmap_dims = {'conv4_3': 38,
-                     'conv7': 19,
-                     'conv8_2': 10,
-                     'conv9_2': 5,
-                     'conv10_2': 3,
-                     'conv11_2': 1}
-
-        obj_scales = {'conv4_3': 0.1,
-                      'conv7': 0.2,
-                      'conv8_2': 0.375,
-                      'conv9_2': 0.55,
-                      'conv10_2': 0.725,
-                      'conv11_2': 0.9}
-
-        aspect_ratios = {'conv4_3': [1., 2., 0.5],
-                         'conv7': [1., 2., 3., 0.5, .333],
-                         'conv8_2': [1., 2., 3., 0.5, .333],
-                         'conv9_2': [1., 2., 3., 0.5, .333],
-                         'conv10_2': [1., 2., 0.5],
-                         'conv11_2': [1., 2., 0.5]}
-
-        fmaps = list(fmap_dims.keys())
-
-        prior_boxes = []
-
-        for k, fmap in enumerate(fmaps):
-            for i in range(fmap_dims[fmap]):
-                for j in range(fmap_dims[fmap]):
-                    cx = (j + 0.5) / fmap_dims[fmap]
-                    cy = (i + 0.5) / fmap_dims[fmap]
-
-                    for ratio in aspect_ratios[fmap]:
-                        prior_boxes.append([cx, cy, obj_scales[fmap] * sqrt(ratio), obj_scales[fmap] / sqrt(ratio)])
-
-                        # For an aspect ratio of 1, use an additional prior whose scale is the geometric mean of the
-                        # scale of the current feature map and the scale of the next feature map
-                        if ratio == 1.:
-                            try:
-                                additional_scale = sqrt(obj_scales[fmap] * obj_scales[fmaps[k + 1]])
-                            # For the last feature map, there is no "next" feature map
-                            except IndexError:
-                                additional_scale = 1.
-                            prior_boxes.append([cx, cy, additional_scale, additional_scale])
-
-        prior_boxes = torch.FloatTensor(prior_boxes)  # (8732, 4)
-        prior_boxes.clamp_(0, 1)  # (8732, 4)
-
-        return prior_boxes
-
     def detect_objects(self, predicted_locs, predicted_scores, min_score, max_overlap, top_k):
         """
+        (hasn't been rewritten yet)
+
         Decipher the 8732 locations and class scores (output of ths SSD300) to detect objects.
         For each class, perform Non-Maximum Suppression (NMS) on boxes that are above a minimum threshold.
         :param predicted_locs: predicted locations/boxes w.r.t the 8732 prior boxes, a tensor of dimensions (N, 8732, 4)
@@ -362,7 +310,7 @@ class SSD300(nn.Module):
         :return: detections (boxes, labels, and scores), lists of length batch_size
         """
         batch_size = predicted_locs.size(0)
-        n_priors = self.priors_cxcy.size(0)
+        n_priors = self.priors.size(0)
         predicted_scores = F.softmax(predicted_scores, dim=2)  # (N, 8732, n_classes)
 
         # Lists to store final predicted boxes, labels, and scores for all images
@@ -375,7 +323,7 @@ class SSD300(nn.Module):
         for i in range(batch_size):
             # Decode object coordinates from the form we regressed predicted boxes to
             decoded_locs = cxcy_to_xy(
-                gcxgcy_to_cxcy(predicted_locs[i], self.priors_cxcy))  # (8732, 4), these are fractional pt. coordinates
+                gcxgcy_to_cxcy(predicted_locs[i], self.priors))  # (8732, 4), these are fractional pt. coordinates
 
             # Lists to store boxes and scores for this image
             image_boxes = list()
