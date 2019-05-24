@@ -32,6 +32,7 @@ def get_default_boxes():
 
     assert m == len(conv_dims)
 
+    # modified scaling to match paper (different from github implementations)
     box_scales = [s_min + (s_max - s_min) / (m - 1) * k for k in range(m)]
 
     aspect_ratios = ([1., 2., 0.5],

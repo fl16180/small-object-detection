@@ -11,7 +11,7 @@
         "args":{
             "data_dir": "./data",
             "image_size": 300,
-            "batch_size": 1,
+            "batch_size": 2,
             "shuffle": true,
             "validation_split": 0.0,
             "num_workers": 1,
@@ -29,7 +29,7 @@
     },
     "loss": "MultiBoxLoss",
     "metrics": [
-        "my_metric", "my_metric2"
+        "calculate_mAP"
     ],
     "lr_scheduler": {
         "type": "StepLR",

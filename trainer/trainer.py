@@ -22,10 +22,10 @@ class Trainer(BaseTrainer):
         self.log_step = int(np.sqrt(data_loader.batch_size))
         self.multiboxloss = loss(threshold=0.5, neg_pos_ratio=3, alpha=1.)
 
-    def _eval_metrics(self, output, target):
+    def _eval_metrics(self, output_boxes, output_scores, boxes, labels):
         acc_metrics = np.zeros(len(self.metrics))
         for i, metric in enumerate(self.metrics):
-            acc_metrics[i] += metric(output, target)
+            acc_metrics[i] += metric(output_boxes, output_scores, boxes, labels)
             self.writer.add_scalar('{}'.format(metric.__name__), acc_metrics[i])
         return acc_metrics
 
@@ -68,8 +68,13 @@ class Trainer(BaseTrainer):
             self.writer.set_step((epoch - 1) * len(self.data_loader) + batch_idx)
             self.writer.add_scalar('loss', loss.item())
             total_loss += loss.item()
+
+            print(output_boxes.size())
+            print(output_scores.size())
+            print(boxes)
+            print(labels)
             ### TODO: IMPLEMENT MAP METRIC
-            # total_metrics += self._eval_metrics(output_boxes, output_scores, boxes, labels)
+            total_metrics += self._eval_metrics(output_boxes, output_scores, boxes, labels)
 
             if batch_idx % self.log_step == 0:
                 self.logger.debug('Train Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}'.format(
