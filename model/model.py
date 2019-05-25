@@ -173,21 +173,17 @@ class Classifiers(nn.Module):
         assert len(self.n_boxes) == 6
 
         self.box4 = nn.Conv2d(512, n_boxes[0] * 4, kernel_size=3, padding=1)
-        self.class4 = nn.Conv2d(512, n_boxes[0] * n_classes, kernel_size=3, padding=1)
-
         self.box7 = nn.Conv2d(1024, n_boxes[1] * 4, kernel_size=3, padding=1)
-        self.class7 = nn.Conv2d(1024, n_boxes[1] * n_classes, kernel_size=3, padding=1)
-
         self.box8 = nn.Conv2d(512, n_boxes[2] * 4, kernel_size=3, padding=1)
-        self.class8 = nn.Conv2d(512, n_boxes[2] * n_classes, kernel_size=3, padding=1)
-
         self.box9 = nn.Conv2d(256, n_boxes[3] * 4, kernel_size=3, padding=1)
-        self.class9 = nn.Conv2d(256, n_boxes[3] * n_classes, kernel_size=3, padding=1)
-
         self.box10 = nn.Conv2d(256, n_boxes[4] * 4, kernel_size=3, padding=1)
-        self.class10 = nn.Conv2d(256, n_boxes[4] * n_classes, kernel_size=3, padding=1)
-
         self.box11 = nn.Conv2d(256, n_boxes[5] * 4, kernel_size=3, padding=1)
+
+        self.class4 = nn.Conv2d(512, n_boxes[0] * n_classes, kernel_size=3, padding=1)
+        self.class7 = nn.Conv2d(1024, n_boxes[1] * n_classes, kernel_size=3, padding=1)
+        self.class8 = nn.Conv2d(512, n_boxes[2] * n_classes, kernel_size=3, padding=1)
+        self.class9 = nn.Conv2d(256, n_boxes[3] * n_classes, kernel_size=3, padding=1)
+        self.class10 = nn.Conv2d(256, n_boxes[4] * n_classes, kernel_size=3, padding=1)
         self.class11 = nn.Conv2d(256, n_boxes[5] * n_classes, kernel_size=3, padding=1)
 
         for layer in self.children():

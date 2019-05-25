@@ -22,8 +22,18 @@ class JointTransformer(object):
         self.augment = augment
 
     def __call__(self, image, boxes, labels):
-        if self.augment is True:
-            pass
+        if self.augment:
+            transformer = t.Compose([
+                t.ConvertFromPIL(),
+                t.PhotometricDistort(),
+                t.Expand(self.mean),
+                t.RandomSampleCrop(),
+                t.RandomMirror(),
+                t.ToPercentCoords(),
+                t.Resize(self.image_size),
+                t.SubtractMeans([123, 117, 104]),
+                t.ToTensor()
+            ])
         else:
             transformer = t.Compose([
                 t.ConvertFromPIL(),
@@ -32,7 +42,7 @@ class JointTransformer(object):
                 t.SubtractMeans([123, 117, 104]),
                 t.ToTensor()
             ])
-            return transformer(image, boxes, labels)
+        return transformer(image, boxes, labels)
 
 
 def collate_fn(batch):
@@ -66,17 +76,15 @@ class VOCDataLoader(BaseDataLoader):
     """
     Load Pascal VOC using BaseDataLoader
     """
-    def __init__(self, data_dir, image_size, batch_size,
-                 collate_fn=collate_fn, shuffle=True, validation_split=0.0,
-                 num_workers=1, training=True, augment=False, split='train'):
-
-        assert split in ('train', 'trainval', 'val', 'test')
+    def __init__(self, data_dir, voc_params, image_size, batch_size,
+                 shuffle=True, validation_split=0.0, collate_fn=collate_fn,
+                 num_workers=1, augment=False, training=True):
 
         self.data_dir = data_dir
         self.dataset = ModVOCDetection(
                 self.data_dir,
-                year='2007',
-                image_set='train',
+                year=voc_params['year'],
+                image_set=voc_params['image_set'],
                 download=False,
                 joint_transform=JointTransformer(image_size))
 

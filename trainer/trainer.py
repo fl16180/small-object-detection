@@ -74,7 +74,7 @@ class Trainer(BaseTrainer):
             print(boxes)
             print(labels)
             ### TODO: IMPLEMENT MAP METRIC
-            total_metrics += self._eval_metrics(output_boxes, output_scores, boxes, labels)
+            # total_metrics += self._eval_metrics(output_boxes, output_scores, boxes, labels)
 
             if batch_idx % self.log_step == 0:
                 self.logger.debug('Train Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}'.format(

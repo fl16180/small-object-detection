@@ -40,14 +40,16 @@ def jaccard_numpy(box_a, box_b):
 
 
 class Compose(object):
-    """Composes several augmentations together.
-    Args:
-        transforms (List[Transform]): list of transforms to compose.
-    Example:
-        >>> augmentations.Compose([
-        >>>     transforms.CenterCrop(10),
-        >>>     transforms.ToTensor(),
-        >>> ])
+    """ Composes several augmentations together.
+
+        Args:
+            transforms (List[Transform]): list of transforms to compose.
+
+        Example:
+            >>> augmentations.Compose([
+            >>>     transforms.CenterCrop(10),
+            >>>     transforms.ToTensor(),
+            >>> ])
     """
 
     def __init__(self, transforms):
@@ -61,7 +63,6 @@ class Compose(object):
 
 class Lambda(object):
     """Applies a lambda as a transform."""
-
     def __init__(self, lambd):
         assert isinstance(lambd, types.LambdaType)
         self.lambd = lambd
@@ -71,6 +72,7 @@ class Lambda(object):
 
 
 class ConvertFromPIL(object):
+    """ PIL image to numpy array """
     def __call__(self, image, boxes=None, labels=None):
         return np.array(image).astype(np.float32), boxes, labels
 
@@ -86,6 +88,7 @@ class SubtractMeans(object):
 
 
 class ToAbsoluteCoords(object):
+    """ Change bbox coordinates from percent to pixels """
     def __call__(self, image, boxes=None, labels=None):
         height, width, channels = image.shape
         boxes[:, 0] *= width
@@ -97,6 +100,7 @@ class ToAbsoluteCoords(object):
 
 
 class ToPercentCoords(object):
+    """ Change bbox coordinates from pixels to percents """
     def __call__(self, image, boxes=None, labels=None):
         height, width, channels = image.shape
         boxes[:, 0] /= width
@@ -118,6 +122,7 @@ class Resize(object):
 
 
 class RandomSaturation(object):
+    """ Randomly apply saturation to image in numpy array form """
     def __init__(self, lower=0.5, upper=1.5):
         self.lower = lower
         self.upper = upper
@@ -132,6 +137,7 @@ class RandomSaturation(object):
 
 
 class RandomHue(object):
+    """ Randomly apply hue change to image in numpy array form """
     def __init__(self, delta=18.0):
         assert delta >= 0.0 and delta <= 360.0
         self.delta = delta
@@ -402,23 +408,3 @@ class PhotometricDistort(object):
             distort = Compose(self.pd[1:])
         im, boxes, labels = distort(im, boxes, labels)
         return self.rand_light_noise(im, boxes, labels)
-
-
-# class SSDAugmentation(object):
-#     def __init__(self, size=300, mean=(104, 117, 123)):
-#         self.mean = mean
-#         self.size = size
-#         self.augment = Compose([
-#             ConvertFromInts(),
-#             ToAbsoluteCoords(),
-#             PhotometricDistort(),
-#             Expand(self.mean),
-#             RandomSampleCrop(),
-#             RandomMirror(),
-#             ToPercentCoords(),
-#             Resize(self.size),
-#             SubtractMeans(self.mean)
-#         ])
-#
-#     def __call__(self, img, boxes, labels):
-#         return self.augment(img, boxes, labels)

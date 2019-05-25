@@ -10,6 +10,10 @@
         "type": "VOCDataLoader",
         "args":{
             "data_dir": "./data",
+            "voc_params":{
+                "year": "2007",
+                "image_set": "train"
+            },
             "image_size": 300,
             "batch_size": 2,
             "shuffle": true,
@@ -21,10 +25,9 @@
     "optimizer": {
         "type": "SGD",
         "args":{
-            "lr": 0.001,
+            "lr": 1e-3,
             "momentum": 0.9,
-            "weight_decay": 0.00001,
-            "amsgrad": true
+            "weight_decay": 5e-4
         }
     },
     "loss": "MultiBoxLoss",
