@@ -40,7 +40,7 @@ def main(config):
 
 
 if __name__ == '__main__':
-    args = argparse.ArgumentParser(description='PyTorch Template')
+    args = argparse.ArgumentParser(description='PyTorch Loader')
     args.add_argument('-c', '--config', default=None, type=str,
                         help='config file path (default: None)')
     args.add_argument('-r', '--resume', default=None, type=str,

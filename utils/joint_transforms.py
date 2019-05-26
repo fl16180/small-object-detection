@@ -1,4 +1,4 @@
-""" Adapted from https://github.com/amdegroot/ssd.pytorch for implementing
+""" Modified from https://github.com/amdegroot/ssd.pytorch for implementing
     joint transforms (i.e. co-operations on both images and corresponding
     bounding boxes and labels). Modifications are made to suit the format
     of our input data.
@@ -35,6 +35,7 @@ def jaccard_numpy(box_a, box_b):
               (box_a[:, 3]-box_a[:, 1]))  # [A,B]
     area_b = ((box_b[2]-box_b[0]) *
               (box_b[3]-box_b[1]))  # [A,B]
+
     union = area_a + area_b - inter
     return inter / union  # [A,B]
 
@@ -84,7 +85,20 @@ class SubtractMeans(object):
     def __call__(self, image, boxes=None, labels=None):
         image = image.astype(np.float32)
         image -= self.mean
-        return image.astype(np.float32), boxes, labels
+        return image, boxes, labels
+
+
+class Normalize(object):
+    def __init__(self, mean, std):
+        self.mean = np.array(mean, dtype=np.float32)
+        self.std = np.array(std, dtype=np.float32)
+
+    def __call__(self, image, boxes=None, labels=None):
+        image = image.astype(np.float32)
+        image /= 256.
+        image -= self.mean
+        image /= self.std
+        return image, boxes, labels
 
 
 class ToAbsoluteCoords(object):
@@ -103,6 +117,7 @@ class ToPercentCoords(object):
     """ Change bbox coordinates from pixels to percents """
     def __call__(self, image, boxes=None, labels=None):
         height, width, channels = image.shape
+
         boxes[:, 0] /= width
         boxes[:, 2] /= width
         boxes[:, 1] /= height
@@ -165,15 +180,15 @@ class RandomLightingNoise(object):
 
 
 class ConvertColor(object):
-    def __init__(self, current='BGR', transform='HSV'):
+    def __init__(self, current='RGB', transform='HSV'):
         self.transform = transform
         self.current = current
 
     def __call__(self, image, boxes=None, labels=None):
-        if self.current == 'BGR' and self.transform == 'HSV':
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        elif self.current == 'HSV' and self.transform == 'BGR':
-            image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
+        if self.current == 'RGB' and self.transform == 'HSV':
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+        elif self.current == 'HSV' and self.transform == 'RGB':
+            image = cv2.cvtColor(image, cv2.COLOR_HSV2RGB)
         else:
             raise NotImplementedError
         return image, boxes, labels
@@ -213,10 +228,12 @@ class ToCV2Image(object):
 
 
 class ToTensor(object):
-    """ PIL loads images in BGR so requires permute in numpy """
+    """ Convert numpy arrays to tensor. Permute to put channels in front """
     def __call__(self, image, boxes=None, labels=None):
-        return torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1), boxes, labels
-
+        image = torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1)
+        boxes = torch.FloatTensor(boxes)
+        labels = torch.LongTensor(labels)
+        return image, boxes, labels
 
 class RandomSampleCrop(object):
     """Crop
@@ -323,6 +340,9 @@ class RandomSampleCrop(object):
 
 
 class Expand(object):
+    """ Randomly expand image size and place original image within.
+        Note: bounding boxes must be in absolute coordinates
+    """
     def __init__(self, mean):
         self.mean = mean
 
@@ -378,10 +398,6 @@ class SwapChannels(object):
         Return:
             a tensor with channels swapped according to swap
         """
-        # if torch.is_tensor(image):
-        #     image = image.data.cpu().numpy()
-        # else:
-        #     image = np.array(image)
         image = image[:, :, self.swaps]
         return image
 
@@ -393,7 +409,7 @@ class PhotometricDistort(object):
             ConvertColor(transform='HSV'),
             RandomSaturation(),
             RandomHue(),
-            ConvertColor(current='HSV', transform='BGR'),
+            ConvertColor(current='HSV', transform='RGB'),
             RandomContrast()
         ]
         self.rand_brightness = RandomBrightness()

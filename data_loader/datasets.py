@@ -1,5 +1,5 @@
-import torch
 from torchvision import datasets
+import numpy as np
 from PIL import Image
 import xml.etree.ElementTree as ET
 
@@ -60,7 +60,7 @@ def parse_annotation_dict(annot):
         boxes.append([int(bbox['xmin']) - 1, int(bbox['ymin']) - 1,
                       int(bbox['xmax']) - 1, int(bbox['ymax']) - 1])
 
-    boxes = torch.FloatTensor(boxes)
-    labels = torch.LongTensor(labels)
+    boxes = np.array(boxes, dtype=np.float32)
+    labels = np.array(labels)
 
     return boxes, labels

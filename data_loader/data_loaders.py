@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from constants import VOC_ENCODING
+from constants import *
 from base import BaseDataLoader
 from utils import joint_transforms as t
 from data_loader.datasets import ModVOCDetection
@@ -17,21 +17,22 @@ class JointTransformer(object):
             Mean subtract,
             Convert image to tensor
     """
-    def __init__(self, image_size, augment=False):
+    def __init__(self, image_size, training, augment):
         self.image_size = image_size
+        self.training = training
         self.augment = augment
 
     def __call__(self, image, boxes, labels):
-        if self.augment:
+        if self.augment and self.training:
             transformer = t.Compose([
                 t.ConvertFromPIL(),
                 t.PhotometricDistort(),
-                t.Expand(self.mean),
+                t.Expand(IMAGENET_MEAN),
                 t.RandomSampleCrop(),
                 t.RandomMirror(),
                 t.ToPercentCoords(),
                 t.Resize(self.image_size),
-                t.SubtractMeans([123, 117, 104]),
+                t.Normalize(IMAGENET_MEAN, IMAGENET_STD),
                 t.ToTensor()
             ])
         else:
@@ -39,7 +40,7 @@ class JointTransformer(object):
                 t.ConvertFromPIL(),
                 t.ToPercentCoords(),
                 t.Resize(self.image_size),
-                t.SubtractMeans([123, 117, 104]),
+                t.Normalize(IMAGENET_MEAN, IMAGENET_STD),
                 t.ToTensor()
             ])
         return transformer(image, boxes, labels)
@@ -82,28 +83,15 @@ class VOCDataLoader(BaseDataLoader):
 
         self.data_dir = data_dir
         self.dataset = ModVOCDetection(
-                self.data_dir,
-                year=voc_params['year'],
-                image_set=voc_params['image_set'],
-                download=False,
-                joint_transform=JointTransformer(image_size))
+            self.data_dir,
+            year=voc_params['year'],
+            image_set=voc_params['image_set'],
+            download=False,
+            joint_transform=JointTransformer(image_size,
+                                             training,
+                                             augment)
+        )
 
         super(VOCDataLoader, self).__init__(self.dataset, batch_size,
                                             shuffle, validation_split,
                                             num_workers, collate_fn)
-
-
-# if augment:
-#     image_trsfm = transforms.Compose([
-#         transforms.Resize((image_size, image_size)),
-#         transforms.ToTensor(),
-#         transforms.RandomCrop(200, 200),
-#         #transforms.Normalize((0.1307,), 0.3081,))
-#     ])
-# else:
-#     image_trsfm = transforms.Compose([
-#         transforms.Resize((image_size, image_size)),
-#         transforms.ToTensor(),
-#         transforms.Normalize(mean=[0.485, 0.456, 0.406],
-#                              std=[0.229, 0.224, 0.225])
-#     ])
