@@ -1,3 +1,4 @@
+# DTYPE = torch.cuda.float if torch.cuda.is_available() else torch.float
 
 
 # Pascal VOC constants

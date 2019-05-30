@@ -15,7 +15,7 @@ class SSDLoss(nn.Module):
 
     def __init__(self, threshold, neg_pos_ratio, alpha, device):
         super().__init__()
-        self.default_cxcy = get_default_boxes()
+        self.default_cxcy = get_default_boxes().to(device)
         self.default_xy = cxcy_to_xy(self.default_cxcy)
 
         self.threshold = threshold
@@ -115,7 +115,7 @@ class MultiBoxLoss(nn.Module):
 
     def __init__(self, threshold=0.5, neg_pos_ratio=3, alpha=1., device=None):
         super(MultiBoxLoss, self).__init__()
-        self.priors_cxcy = get_default_boxes()
+        self.priors_cxcy = get_default_boxes().to(device)
         self.priors_xy = cxcy_to_xy(self.priors_cxcy)
         self.threshold = threshold
         self.neg_pos_ratio = neg_pos_ratio
