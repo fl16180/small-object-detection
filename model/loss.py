@@ -10,8 +10,6 @@ import torchvision
 from utils import cxcy_to_gcxgcy, cxcy_to_xy, xy_to_cxcy, gcxgcy_to_cxcy
 from utils import get_default_boxes, find_jaccard_overlap
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 class SSDLoss(nn.Module):
 

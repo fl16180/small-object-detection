@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torchvision.utils import make_grid
 from base import BaseTrainer
+from model.metric import calculate_mAP
 
 
 class Trainer(BaseTrainer):
@@ -74,9 +75,9 @@ class Trainer(BaseTrainer):
 
         if self.do_validation:
             val_log = self._valid_epoch(epoch)
-
             metric_log = self._valid_metric(epoch)
-            log = {**log, **val_log}
+
+            log = {**log, **val_log, **metric_log}
 
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
@@ -89,8 +90,6 @@ class Trainer(BaseTrainer):
 
         :return: A log that contains information about validation
 
-        Note:
-            The validation metrics in log must have the key 'val_metrics'.
         """
         self.model.eval()
         total_val_loss = 0
@@ -118,4 +117,47 @@ class Trainer(BaseTrainer):
         }
 
     def _valid_metric(self, epoch):
-        pass
+        """ Compute mAP metric over validation set after certain number of
+            epochs. Because the metric is computed over the whole dataset,
+            I separated it from the validation loss method to lower
+            training time.
+
+            Return: A log with information about metrics
+        """
+        self.model.eval()
+
+        # must compute mAP over entire dataset
+        all_boxes = list()
+        all_labels = list()
+        all_scores = list()
+        all_true_boxes = list()
+        all_true_labels = list()
+        all_difficulties = list()
+
+        with torch.no_grad():
+            for batch_idx, (data, boxes, labels, difficulties) in enumerate(self.valid_data_loader):
+                data = data.to(self.device)
+                boxes = [b.to(self.device) for b in boxes]
+                labels = [l.to(self.device) for l in labels]
+                difficulties = [d.to(self.device) for d in difficulties]
+
+                output_boxes, output_scores = model(data)
+
+                batch_boxes, batch_labels, batch_scores = model.detect_objects(output_locs, output_scores,
+                                                                               min_score=0.01, max_overlap=0.45,
+                                                                               top_k=200)
+
+                all_boxes.extend(batch_boxes)
+                all_labels.extend(batch_labels)
+                all_scores.extend(batch_scores)
+                all_true_boxes.extend(boxes)
+                all_true_labels.extend(labels)
+                all_difficulties.extend(difficulties)
+
+            # Calculate mAP
+            APs, mAP = calculate_mAP(all_boxes, all_labels, all_scores, all_true_boxes, all_true_labels, all_difficulties)
+            print(APs, mAP)
+            # self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
+            # self.writer.add_scalar('loss', loss.item())
+            # total_val_loss += loss.item()
+            # self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
