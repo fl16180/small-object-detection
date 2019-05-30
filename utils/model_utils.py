@@ -1,3 +1,7 @@
+""" Helper functions for computing the model forward pass and the loss,
+as implemented at:
+https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection
+"""
 import torch
 from math import sqrt
 

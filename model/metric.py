@@ -2,26 +2,7 @@ import torch
 from constants import VOC_ENCODING
 
 
-def my_metric(output, target):
-    with torch.no_grad():
-        pred = torch.argmax(output, dim=1)
-        assert pred.shape[0] == len(target)
-        correct = 0
-        correct += torch.sum(pred == target).item()
-    return correct / len(target)
-
-
-def my_metric2(output, target, k=3):
-    with torch.no_grad():
-        pred = torch.topk(output, k, dim=1)[1]
-        assert pred.shape[0] == len(target)
-        correct = 0
-        for i in range(k):
-            correct += torch.sum(pred[:, i] == target).item()
-    return correct / len(target)
-
-
-def calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels):
+def calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties):
     """
     Calculate the Mean Average Precision (mAP) of detected objects.
     See https://medium.com/@jonathan_hui/map-mean-average-precision-for-object-detection-45c121a31173 for an explanation
@@ -151,17 +132,3 @@ def calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels):
     average_precisions = {rev_label_map[c + 1]: v for c, v in enumerate(average_precisions.tolist())}
 
     return average_precisions, mean_average_precision
-
-
-def VOC12_mAP(pred_boxes, pred_scores, true_boxes, true_labels):
-    n_classes = len(VOC_ENCODING)
-
-    # stack all truth elements together across batch
-    true_boxes = torch.cat(true_boxes, dim=0)
-    true_labels = torch.cat(true_labels, dim=0)
-
-    true_images = list()
-    for i in range(len(true_labels)):
-        true_images.extend([i] * true_labels[i].size(0))
-    true_images = torch.LongTensor(true_images).to(
-        device)

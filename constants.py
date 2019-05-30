@@ -27,7 +27,7 @@ VOC_CLASS_NAMES = (
 VOC_ENCODING = {cl: id for id, cl in enumerate(VOC_CLASS_NAMES)}
 VOC_DECODING = {id: cl for id, cl in enumerate(VOC_CLASS_NAMES)}
 
-VOC_NUM_CLASSES = 20
+VOC_NUM_CLASSES = 21
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]

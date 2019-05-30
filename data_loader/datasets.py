@@ -32,12 +32,12 @@ class ModVOCDetection(datasets.VOCDetection):
         target = self.parse_voc_xml(
             ET.parse(self.annotations[index]).getroot())
 
-        boxes, labels = parse_annotation_dict(target)
+        boxes, labels, difficulties = parse_annotation_dict(target)
 
         if self.joint_transform is not None:
             img, boxes, labels = self.joint_transform(img, boxes, labels)
 
-        return img, boxes, labels
+        return img, boxes, labels, difficulties
 
 
 def parse_annotation_dict(annot):
@@ -47,20 +47,24 @@ def parse_annotation_dict(annot):
 
     labels = []
     boxes = []
+    difficulties = []
     if isinstance(objects, list):
         for o in objects:
             labels.append(VOC_ENCODING[o['name']])
             bbox = o['bndbox']
             boxes.append([int(bbox['xmin']) - 1, int(bbox['ymin']) - 1,
                           int(bbox['xmax']) - 1, int(bbox['ymax']) - 1])
+            difficulties.append(o['difficult'])
 
     elif isinstance(objects, dict):
         labels.append(VOC_ENCODING[objects['name']])
         bbox = objects['bndbox']
         boxes.append([int(bbox['xmin']) - 1, int(bbox['ymin']) - 1,
                       int(bbox['xmax']) - 1, int(bbox['ymax']) - 1])
+        difficulties.append(objects['difficult'])
 
     boxes = np.array(boxes, dtype=np.float32)
     labels = np.array(labels)
+    difficulties = np.array(difficulties)
 
-    return boxes, labels
+    return boxes, labels, difficulties

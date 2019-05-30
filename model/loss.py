@@ -10,7 +10,92 @@ import torchvision
 from utils import cxcy_to_gcxgcy, cxcy_to_xy, xy_to_cxcy, gcxgcy_to_cxcy
 from utils import get_default_boxes, find_jaccard_overlap
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+class SSDLoss(nn.Module):
+
+    def __init__(self, threshold, neg_pos_ratio, alpha, device):
+        super().__init__()
+        self.default_cxcy = get_default_boxes()
+        self.default_xy = cxcy_to_xy(self.default_cxcy)
+
+        self.threshold = threshold
+        self.hard_neg_scale = neg_pos_ratio
+        self.alpha = alpha
+        self.device = device
+
+        self.smooth_l1 = nn.SmoothL1Loss(reduction='none')
+        self.cross_entropy = nn.CrossEntropyLoss(reduction='none')
+
+
+    def forward(self, output_boxes, output_scores, true_boxes, true_labels):
+
+        batch_size = output_boxes.size(0)
+        n_classes = output_boxes.size(2)
+        n_priors = self.default_cxcy.size(0)
+
+        gt_locs = torch.Tensor(batch_size, n_priors, 4).to(self.device)
+        gt_class = torch.LongTensor(batch_size, n_priors).to(self.device)
+
+        for im in range(batch_size):
+            n_objects = true_boxes[im].size(0)
+
+            # compute IoU for each ground truth box with default boxes
+            # (n_objects, 8732)
+            overlaps = find_jaccard_overlap(true_boxes[im], self.default_xy)
+
+            # find highest-overlap object for each default, and then highest-
+            # overlap default for each object
+            overlap_per_default, object_per_default = overlaps.max(dim=0)
+            overlap_per_object, default_per_object = overlaps.max(dim=1)
+
+            # assign object to default box with highest overlap
+            object_per_default[default_per_object] = torch.LongTensor(range(n_objects)).to(self.device)
+
+            # give these default boxes an overlap of 1 (ensure positive)
+            overlap_per_default[default_per_object] = 1.
+
+            # assign labels to the default boxes according to the best overlap
+            default_labels = true_labels[im][object_per_default]
+            default_labels[overlap_per_default < self.threshold] = 0
+
+            gt_class[im] = default_labels
+            gt_locs[im] = cxcy_to_gcxgcy(xy_to_cxcy(true_boxes[im][object_per_default]), self.default_cxcy)
+
+        positive_defaults = (gt_class > 0)
+
+        # localization loss
+        L_loc = self.smooth_l1(output_boxes[positive_defaults], true_boxes[positive_defaults])
+
+        # confidence loss
+        n_positives = positive_defaults.sum(dim=1)  # (N)
+        n_hard_negatives = self.hard_neg_scale * n_positives
+
+        conf_all = output_scores.view(-1, n_classes)
+        L_conf_all = self.cross_entropy(conf_all, gt_class.view(-1))
+        L_conf_all = L_conf_all.view(batch_size, n_priors)  # (N, 8732)
+
+        # We already know which priors are positive
+        L_conf_pos = L_conf_all[positive_defaults]  # (sum(n_positives))
+
+        # Next, find which priors are hard-negative
+        # To do this, sort ONLY negative priors in each image in order of decreasing loss and take top n_hard_negatives
+        L_conf_neg = L_con_all.clone()  # (N, 8732)
+        L_conf_neg[positive_defaults] = 0.  # (N, 8732), positive priors are ignored (never in top n_hard_negatives)
+        L_conf_neg, _ = L_conf_neg.sort(dim=1, descending=True)  # (N, 8732), sorted by decreasing hardness
+        hardness_ranks = torch.LongTensor(range(n_priors)).unsqueeze(0).expand_as(L_conf_neg).to(device)  # (N, 8732)
+        hard_negatives = hardness_ranks < n_hard_negatives.unsqueeze(1)
+        L_conf_hard_neg = L_conf_neg[hard_negatives]
+
+        # As in the paper, averaged over positive priors only, although computed over both positive and hard-negative priors
+        print(n_positives)
+        print(n_positives.sum())
+        L_conf = (L_conf_hard_neg.sum() + L_conf_pos.sum()) / n_positives.sum().float()  # (), scalar
+
+        loss = L_conf + self.alpha * L_loc
+        return loss
+
 
 """
 Reference implementation of MultiBoxLoss at:
@@ -30,13 +115,14 @@ class MultiBoxLoss(nn.Module):
     (2) a confidence loss for the predicted class scores.
     """
 
-    def __init__(self, threshold=0.5, neg_pos_ratio=3, alpha=1.):
+    def __init__(self, threshold=0.5, neg_pos_ratio=3, alpha=1., device=None):
         super(MultiBoxLoss, self).__init__()
         self.priors_cxcy = get_default_boxes()
         self.priors_xy = cxcy_to_xy(self.priors_cxcy)
         self.threshold = threshold
         self.neg_pos_ratio = neg_pos_ratio
         self.alpha = alpha
+        self.device = device
 
         self.smooth_l1 = nn.L1Loss()
         self.cross_entropy = nn.CrossEntropyLoss(reduce=False)
@@ -56,8 +142,8 @@ class MultiBoxLoss(nn.Module):
 
         assert n_priors == predicted_locs.size(1) == predicted_scores.size(1)
 
-        true_locs = torch.zeros((batch_size, n_priors, 4), dtype=torch.float).to(device)  # (N, 8732, 4)
-        true_classes = torch.zeros((batch_size, n_priors), dtype=torch.long).to(device)  # (N, 8732)
+        true_locs = torch.zeros((batch_size, n_priors, 4), dtype=torch.float).to(self.device)  # (N, 8732, 4)
+        true_classes = torch.zeros((batch_size, n_priors), dtype=torch.long).to(self.device)  # (N, 8732)
 
         # For each image
         for i in range(batch_size):
@@ -78,7 +164,7 @@ class MultiBoxLoss(nn.Module):
             _, prior_for_each_object = overlap.max(dim=1)  # (N_o)
 
             # Then, assign each object to the corresponding maximum-overlap-prior. (This fixes 1.)
-            object_for_each_prior[prior_for_each_object] = torch.LongTensor(range(n_objects)).to(device)
+            object_for_each_prior[prior_for_each_object] = torch.LongTensor(range(n_objects)).to(self.device)
 
             # To ensure these priors qualify, artificially give them an overlap of greater than 0.5. (This fixes 2.)
             overlap_for_each_prior[prior_for_each_object] = 1.
@@ -128,7 +214,7 @@ class MultiBoxLoss(nn.Module):
         conf_loss_neg = conf_loss_all.clone()  # (N, 8732)
         conf_loss_neg[positive_priors] = 0.  # (N, 8732), positive priors are ignored (never in top n_hard_negatives)
         conf_loss_neg, _ = conf_loss_neg.sort(dim=1, descending=True)  # (N, 8732), sorted by decreasing hardness
-        hardness_ranks = torch.LongTensor(range(n_priors)).unsqueeze(0).expand_as(conf_loss_neg).to(device)  # (N, 8732)
+        hardness_ranks = torch.LongTensor(range(n_priors)).unsqueeze(0).expand_as(conf_loss_neg).to(self.device)  # (N, 8732)
         hard_negatives = hardness_ranks < n_hard_negatives.unsqueeze(1)  # (N, 8732)
         conf_loss_hard_neg = conf_loss_neg[hard_negatives]  # (sum(n_hard_negatives))
 

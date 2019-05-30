@@ -62,15 +62,17 @@ def collate_fn(batch):
     images = []
     boxes_list = []
     labels_list = []
+    difficulties = []
 
     for item in batch:
         images.append(item[0])
         boxes_list.append(item[1])
         labels_list.append(item[2])
+        difficulties.append(item[3])
 
     images = torch.stack(images, dim=0)
 
-    return images, boxes_list, labels_list
+    return images, boxes_list, labels_list, difficulties
 
 
 class VOCDataLoader(BaseDataLoader):
