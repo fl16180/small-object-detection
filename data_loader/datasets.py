@@ -42,7 +42,14 @@ class ModVOCDetection(datasets.VOCDetection):
 
 
 def parse_annotation_dict(annot):
-    """ Parse the annotation dictionary for a single image/label set. """
+    """ Parse the annotation dictionary for a single image/label set.
+
+        Annotations are stored in a nested dictionary. We require three
+        elements:
+            1. labels of any bounding boxes
+            2. corner coordinates of any bounding boxes
+            3. "difficulty" of the detected object, used later for metrics
+    """
 
     objects = annot['annotation']['object']
 

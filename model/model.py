@@ -2,14 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import vgg16
-
-from base import BaseModel
-from utils import *
-
 from math import sqrt
 from itertools import product as product
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+from base import BaseModel
+from utils import *
+from constants import *
 
 
 class VGG16(nn.Module):
@@ -246,7 +244,7 @@ class SSD300(nn.Module):
                 feature set.
     """
 
-    def __init__(self, n_classes, n_boxes=(4, 6, 6, 6, 4, 4)):
+    def __init__(self, n_classes=VOC_NUM_CLASSES, n_boxes=(4, 6, 6, 6, 4, 4)):
         super(SSD300, self).__init__()
 
         self.n_classes = n_classes
@@ -352,7 +350,7 @@ class SSD300(nn.Module):
 
                 # A torch.uint8 (byte) tensor to keep track of which predicted boxes to suppress
                 # 1 implies suppress, 0 implies don't suppress
-                suppress = torch.zeros((n_above_min_score), dtype=torch.uint8).to(device) # (n_qualified)
+                suppress = torch.zeros((n_above_min_score), dtype=torch.uint8).to(DEVICE) # (n_qualified)
 
                 # Consider each box in order of decreasing scores
                 for box in range(class_decoded_locs.size(0)):

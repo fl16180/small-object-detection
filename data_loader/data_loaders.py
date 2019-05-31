@@ -17,13 +17,13 @@ class JointTransformer(object):
             Mean subtract,
             Convert image to tensor
     """
-    def __init__(self, image_size, training, augment):
+    def __init__(self, image_size, mode, augment):
         self.image_size = image_size
-        self.training = training
+        self.mode = mode
         self.augment = augment
 
     def __call__(self, image, boxes, labels):
-        if self.augment and self.training:
+        if self.augment and self.mode == 'train':
             transformer = t.Compose([
                 t.ConvertFromPIL(),
                 t.PhotometricDistort(),
@@ -79,9 +79,17 @@ class VOCDataLoader(BaseDataLoader):
     """
     Load Pascal VOC using BaseDataLoader
     """
-    def __init__(self, data_dir, voc_params, image_size, batch_size,
+    def __init__(self, data_dir, image_size, batch_size,
                  shuffle=True, validation_split=0.0, collate_fn=collate_fn,
-                 num_workers=1, augment=False, training=True):
+                 num_workers=1, augment=False, mode='train'):
+
+        assert mode in ('train', 'valid', 'test')
+        if mode == 'train':
+            voc_params = VOC_TRAIN_PARAMS
+        elif mode == 'valid':
+            voc_params = VOC_VALID_PARAMS
+        elif mode == 'test':
+            voc_params = VOC_TEST_PARAMS
 
         self.data_dir = data_dir
         self.dataset = ModVOCDetection(
@@ -90,7 +98,7 @@ class VOCDataLoader(BaseDataLoader):
             image_set=voc_params['image_set'],
             download=False,
             joint_transform=JointTransformer(image_size,
-                                             training,
+                                             mode,
                                              augment)
         )
 

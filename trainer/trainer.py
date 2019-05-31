@@ -4,6 +4,7 @@ from torchvision.utils import make_grid
 from base import BaseTrainer
 from model.metric import calculate_mAP
 
+from constants import DEVICE
 
 class Trainer(BaseTrainer):
     """
@@ -22,7 +23,7 @@ class Trainer(BaseTrainer):
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.batch_size))
         self.multiboxloss = loss(threshold=0.5, neg_pos_ratio=3,
-                                 alpha=1., device=self.device)
+                                 alpha=1., device=DEVICE)
 
     def _train_epoch(self, epoch):
         """
@@ -47,9 +48,9 @@ class Trainer(BaseTrainer):
 
             if batch_idx > 10:
                 continue
-            data = data.to(self.device)
-            boxes = [b.to(self.device) for b in boxes]
-            labels = [l.to(self.device) for l in labels]
+            data = data.to(DEVICE)
+            boxes = [b.to(DEVICE) for b in boxes]
+            labels = [l.to(DEVICE) for l in labels]
 
             self.optimizer.zero_grad()
             output_boxes, output_scores = self.model(data)
@@ -100,9 +101,9 @@ class Trainer(BaseTrainer):
             for batch_idx, (data, boxes, labels, _) in enumerate(self.valid_data_loader):
                 if batch_idx > 10:
                     continue
-                data = data.to(self.device)
-                boxes = [b.to(self.device) for b in boxes]
-                labels = [l.to(self.device) for l in labels]
+                data = data.to(DEVICE)
+                boxes = [b.to(DEVICE) for b in boxes]
+                labels = [l.to(DEVICE) for l in labels]
 
                 output_boxes, output_scores = self.model(data)
 
@@ -154,10 +155,10 @@ class Trainer(BaseTrainer):
                 if batch_idx > 10:
                     continue
                 print(batch_idx)
-                data = data.to(self.device)
-                boxes = [b.to(self.device) for b in boxes]
-                labels = [l.to(self.device) for l in labels]
-                difficulties = [d.to(self.device) for d in difficulties]
+                data = data.to(DEVICE)
+                boxes = [b.to(DEVICE) for b in boxes]
+                labels = [l.to(DEVICE) for l in labels]
+                difficulties = [d.to(DEVICE) for d in difficulties]
 
                 output_boxes, output_scores = self.model(data)
 

@@ -13,8 +13,8 @@ def main(config):
     logger = config.get_logger('train')
 
     # setup data_loader instances
-    data_loader = config.initialize('data_loader', module_data)
-    valid_data_loader = data_loader.split_validation()
+    data_loader = config.initialize('data_loader', module_data, mode='train')
+    valid_data_loader = config.initialize('data_loader', module_data, mode='valid')
 
     # build model architecture, then print to console
     model = config.initialize('arch', module_arch)

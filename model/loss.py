@@ -9,6 +9,7 @@ import torchvision
 
 from utils import cxcy_to_gcxgcy, cxcy_to_xy, xy_to_cxcy, gcxgcy_to_cxcy
 from utils import get_default_boxes, find_jaccard_overlap
+from constants import DEVICE
 
 
 class SSDLoss(nn.Module):
@@ -113,7 +114,7 @@ class MultiBoxLoss(nn.Module):
     (2) a confidence loss for the predicted class scores.
     """
 
-    def __init__(self, threshold=0.5, neg_pos_ratio=3, alpha=1., device=None):
+    def __init__(self, threshold=0.5, neg_pos_ratio=3, alpha=1., device=DEVICE):
         super(MultiBoxLoss, self).__init__()
         self.priors_cxcy = get_default_boxes().to(device)
         self.priors_xy = cxcy_to_xy(self.priors_cxcy)

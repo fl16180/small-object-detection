@@ -52,13 +52,13 @@ class ConfigParser:
             2: logging.DEBUG
         }
 
-    def initialize(self, name, module, *args):
+    def initialize(self, name, module, *args, **kwargs):
         """
         finds a function handle with the name given as 'type' in config, and returns the
         instance initialized with corresponding keyword args given as 'args'.
         """
         module_cfg = self[name]
-        return getattr(module, module_cfg['type'])(*args, **module_cfg['args'])
+        return getattr(module, module_cfg['type'])(*args, **module_cfg['args'], **kwargs)
 
     def __getitem__(self, name):
         return self.config[name]

@@ -1,6 +1,5 @@
 {
     "name": "VOC_SSD",
-    "n_gpu": 1,
 
     "arch": {
         "type": "SSD300",
@@ -9,19 +8,11 @@
     "data_loader": {
         "type": "VOCDataLoader",
         "args":{
-            "data_dir": "./data",
-            "train_params":{
-                "year": "2007",
-                "image_set": "train"
-            },
-            "valid_params":{
-                "year": "2007",
-                "image_set": "trainval"
-            },
+            "data_dir": "./data/",
             "image_size": 300,
             "batch_size": 2,
             "shuffle": true,
-            "validation_split": 0.5,
+            "validation_split": 0.0,
             "num_workers": 1,
             "augment": false
         }
@@ -52,7 +43,7 @@
         "save_period": 1,
         "verbosity": 2,
 
-        "monitor": "min val_loss",
+        "monitor": "max val_metric",
         "early_stop": 10,
 
         "tensorboardX": true
