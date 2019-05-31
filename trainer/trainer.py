@@ -44,6 +44,9 @@ class Trainer(BaseTrainer):
 
         total_loss = 0
         for batch_idx, (data, boxes, labels, _) in enumerate(self.data_loader):
+
+            if batch_idx > 10:
+                continue
             data = data.to(self.device)
             boxes = [b.to(self.device) for b in boxes]
             labels = [l.to(self.device) for l in labels]
@@ -95,6 +98,8 @@ class Trainer(BaseTrainer):
         total_val_loss = 0
         with torch.no_grad():
             for batch_idx, (data, boxes, labels, _) in enumerate(self.valid_data_loader):
+                if batch_idx > 10:
+                    continue
                 data = data.to(self.device)
                 boxes = [b.to(self.device) for b in boxes]
                 labels = [l.to(self.device) for l in labels]
@@ -107,6 +112,16 @@ class Trainer(BaseTrainer):
                 self.writer.add_scalar('loss', loss.item())
                 total_val_loss += loss.item()
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+
+                # if batch_idx % self.log_step == 0:
+                #     self.logger.debug('Train Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}'.format(
+                #         epoch,
+                #         batch_idx * self.data_loader.batch_size,
+                #         self.data_loader.n_samples,
+                #         100.0 * batch_idx / len(self.data_loader),
+                #         loss.item()))
+                #     self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+
 
         # add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():
@@ -136,14 +151,17 @@ class Trainer(BaseTrainer):
 
         with torch.no_grad():
             for batch_idx, (data, boxes, labels, difficulties) in enumerate(self.valid_data_loader):
+                if batch_idx > 10:
+                    continue
+                print(batch_idx)
                 data = data.to(self.device)
                 boxes = [b.to(self.device) for b in boxes]
                 labels = [l.to(self.device) for l in labels]
                 difficulties = [d.to(self.device) for d in difficulties]
 
-                output_boxes, output_scores = model(data)
+                output_boxes, output_scores = self.model(data)
 
-                batch_boxes, batch_labels, batch_scores = model.detect_objects(output_locs, output_scores,
+                batch_boxes, batch_labels, batch_scores = self.model.detect_objects(output_boxes, output_scores,
                                                                                min_score=0.01, max_overlap=0.45,
                                                                                top_k=200)
 
@@ -155,9 +173,12 @@ class Trainer(BaseTrainer):
                 all_difficulties.extend(difficulties)
 
             # Calculate mAP
-            APs, mAP = calculate_mAP(all_boxes, all_labels, all_scores, all_true_boxes, all_true_labels, all_difficulties)
-            print(APs, mAP)
+            class_APs, mAP = calculate_mAP(all_boxes, all_labels, all_scores, all_true_boxes, all_true_labels, all_difficulties)
             # self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
             # self.writer.add_scalar('loss', loss.item())
             # total_val_loss += loss.item()
             # self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+        return {
+            'val_mAP': mAP,
+            'val_class_AP': class_APs
+        }

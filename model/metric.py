@@ -1,5 +1,8 @@
 import torch
-from constants import VOC_ENCODING
+from constants import VOC_ENCODING, VOC_ENCODING, VOC_DECODING
+from utils import find_jaccard_overlap
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, true_difficulties):
@@ -16,7 +19,7 @@ def calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, tr
     """
     assert len(det_boxes) == len(det_labels) == len(det_scores) == len(true_boxes) == len(
         true_labels) # these are all lists of tensors of the same length, i.e. number of images
-    n_classes = len(label_map)
+    n_classes = len(VOC_ENCODING)
 
     # Store all (true) objects in a single continuous tensor while keeping track of the image it is from
     true_images = list()
@@ -129,6 +132,6 @@ def calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, tr
     mean_average_precision = average_precisions.mean().item()
 
     # Keep class-wise average precisions in a dictionary
-    average_precisions = {rev_label_map[c + 1]: v for c, v in enumerate(average_precisions.tolist())}
+    average_precisions = {VOC_DECODING[c + 1]: v for c, v in enumerate(average_precisions.tolist())}
 
     return average_precisions, mean_average_precision

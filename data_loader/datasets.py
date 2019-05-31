@@ -1,3 +1,4 @@
+import torch
 from torchvision import datasets
 import numpy as np
 from PIL import Image
@@ -37,7 +38,7 @@ class ModVOCDetection(datasets.VOCDetection):
         if self.joint_transform is not None:
             img, boxes, labels = self.joint_transform(img, boxes, labels)
 
-        return img, boxes, labels, difficulties
+        return img, boxes, labels, torch.LongTensor(difficulties)
 
 
 def parse_annotation_dict(annot):
@@ -65,6 +66,6 @@ def parse_annotation_dict(annot):
 
     boxes = np.array(boxes, dtype=np.float32)
     labels = np.array(labels)
-    difficulties = np.array(difficulties)
+    difficulties = np.array(difficulties).astype(int)
 
     return boxes, labels, difficulties

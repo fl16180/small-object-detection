@@ -10,14 +10,18 @@
         "type": "VOCDataLoader",
         "args":{
             "data_dir": "./data",
-            "voc_params":{
+            "train_params":{
                 "year": "2007",
                 "image_set": "train"
+            },
+            "valid_params":{
+                "year": "2007",
+                "image_set": "trainval"
             },
             "image_size": 300,
             "batch_size": 2,
             "shuffle": true,
-            "validation_split": 0.0,
+            "validation_split": 0.5,
             "num_workers": 1,
             "augment": false
         }

@@ -235,6 +235,7 @@ class ToTensor(object):
         labels = torch.LongTensor(labels)
         return image, boxes, labels
 
+
 class RandomSampleCrop(object):
     """Crop
     Arguments:
