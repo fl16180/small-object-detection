@@ -46,8 +46,6 @@ class Trainer(BaseTrainer):
         total_loss = 0
         for batch_idx, (data, boxes, labels, _) in enumerate(self.data_loader):
 
-            if batch_idx > 10:
-                break
             data = data.to(DEVICE)
             boxes = [b.to(DEVICE) for b in boxes]
             labels = [l.to(DEVICE) for l in labels]
@@ -79,9 +77,9 @@ class Trainer(BaseTrainer):
 
         if self.do_validation:
             val_log = self._valid_epoch(epoch)
-            metric_log = self._valid_metric(epoch)
-
-            log = {**log, **val_log, **metric_log}
+           # metric_log = self._valid_metric(epoch)
+            log = {**log, **val_log}
+           # log = {**log, **val_log, **metric_log}
 
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
@@ -99,8 +97,7 @@ class Trainer(BaseTrainer):
         total_val_loss = 0
         with torch.no_grad():
             for batch_idx, (data, boxes, labels, _) in enumerate(self.valid_data_loader):
-                if batch_idx > 10:
-                    break
+
                 data = data.to(DEVICE)
                 boxes = [b.to(DEVICE) for b in boxes]
                 labels = [l.to(DEVICE) for l in labels]
@@ -154,8 +151,7 @@ class Trainer(BaseTrainer):
 
         with torch.no_grad():
             for batch_idx, (data, boxes, labels, difficulties) in enumerate(self.valid_data_loader):
-                if batch_idx > 10:
-                    break
+
 
                 data = data.to(DEVICE)
                 boxes = [b.to(DEVICE) for b in boxes]

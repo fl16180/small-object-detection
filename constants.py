@@ -40,7 +40,7 @@ VOC_TRAIN_PARAMS = {
 
 VOC_VALID_PARAMS = {
     "year": "2007",
-    "image_set": "trainval"
+    "image_set": "val"
 }
 
 VOC_TEST_PARAMS = {
