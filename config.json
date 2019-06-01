@@ -10,11 +10,11 @@
         "args":{
             "data_dir": "./data/",
             "image_size": 300,
-            "batch_size": 2,
+            "batch_size": 1,
             "shuffle": true,
             "validation_split": 0.0,
             "num_workers": 1,
-            "augment": false
+            "augment": true
         }
     },
     "optimizer": {
@@ -26,9 +26,7 @@
         }
     },
     "loss": "MultiBoxLoss",
-    "metrics": [
-        "calculate_mAP"
-    ],
+    "metrics": ["meanAP"],
     "lr_scheduler": {
         "type": "StepLR",
         "args": {
@@ -43,7 +41,7 @@
         "save_period": 1,
         "verbosity": 2,
 
-        "monitor": "max val_metric",
+        "monitor": "max val_mAP",
         "early_stop": 10,
 
         "tensorboardX": true

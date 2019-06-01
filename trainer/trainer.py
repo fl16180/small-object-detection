@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torchvision.utils import make_grid
 from base import BaseTrainer
-from model.metric import calculate_mAP
+from model.metric import meanAP
 
 from constants import DEVICE
 
@@ -47,7 +47,7 @@ class Trainer(BaseTrainer):
         for batch_idx, (data, boxes, labels, _) in enumerate(self.data_loader):
 
             if batch_idx > 10:
-                continue
+                break
             data = data.to(DEVICE)
             boxes = [b.to(DEVICE) for b in boxes]
             labels = [l.to(DEVICE) for l in labels]
@@ -100,7 +100,7 @@ class Trainer(BaseTrainer):
         with torch.no_grad():
             for batch_idx, (data, boxes, labels, _) in enumerate(self.valid_data_loader):
                 if batch_idx > 10:
-                    continue
+                    break
                 data = data.to(DEVICE)
                 boxes = [b.to(DEVICE) for b in boxes]
                 labels = [l.to(DEVICE) for l in labels]
@@ -114,14 +114,14 @@ class Trainer(BaseTrainer):
                 total_val_loss += loss.item()
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
 
-                # if batch_idx % self.log_step == 0:
-                #     self.logger.debug('Train Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}'.format(
-                #         epoch,
-                #         batch_idx * self.data_loader.batch_size,
-                #         self.data_loader.n_samples,
-                #         100.0 * batch_idx / len(self.data_loader),
-                #         loss.item()))
-                #     self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+                if batch_idx % (10 * self.log_step) == 0:
+                    self.logger.debug('Val Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}'.format(
+                        epoch,
+                        batch_idx * self.data_loader.batch_size,
+                        self.data_loader.n_samples,
+                        100.0 * batch_idx / len(self.data_loader),
+                        loss.item()))
+                    self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
 
 
         # add histogram of model parameters to the tensorboard
@@ -140,6 +140,8 @@ class Trainer(BaseTrainer):
 
             Return: A log with information about metrics
         """
+        print('Computing metrics:')
+
         self.model.eval()
 
         # must compute mAP over entire dataset
@@ -153,8 +155,8 @@ class Trainer(BaseTrainer):
         with torch.no_grad():
             for batch_idx, (data, boxes, labels, difficulties) in enumerate(self.valid_data_loader):
                 if batch_idx > 10:
-                    continue
-                print(batch_idx)
+                    break
+
                 data = data.to(DEVICE)
                 boxes = [b.to(DEVICE) for b in boxes]
                 labels = [l.to(DEVICE) for l in labels]
@@ -173,12 +175,16 @@ class Trainer(BaseTrainer):
                 all_true_labels.extend(labels)
                 all_difficulties.extend(difficulties)
 
+                if batch_idx % (10 * self.log_step) == 0:
+                    self.logger.debug('Val Epoch: {} [{}/{} ({:.0f}%)] Append'.format(
+                        epoch,
+                        batch_idx * self.data_loader.batch_size,
+                        self.data_loader.n_samples,
+                        100.0 * batch_idx / len(self.data_loader)))
+
             # Calculate mAP
-            class_APs, mAP = calculate_mAP(all_boxes, all_labels, all_scores, all_true_boxes, all_true_labels, all_difficulties)
-            # self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
-            # self.writer.add_scalar('loss', loss.item())
-            # total_val_loss += loss.item()
-            # self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+            class_APs, mAP = meanAP(all_boxes, all_labels, all_scores, all_true_boxes, all_true_labels, all_difficulties)
+
         return {
             'val_mAP': mAP,
             'val_class_AP': class_APs

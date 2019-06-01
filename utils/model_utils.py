@@ -1,7 +1,8 @@
 import torch
 from math import sqrt
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+from constants import DEVICE
+
 
 def decimate(tensor, m):
     """
@@ -67,7 +68,7 @@ def get_default_boxes():
                             additional_scale = 1.
                         default_boxes.append([cx, cy, square_scale, square_scale])
 
-    default_boxes = torch.FloatTensor(default_boxes).to(device)
+    default_boxes = torch.FloatTensor(default_boxes).to(DEVICE)
     default_boxes.clamp_(0, 1)
 
     return default_boxes
