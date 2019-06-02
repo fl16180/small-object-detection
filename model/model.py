@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import vgg16
 from math import sqrt
-from itertools import product as product
 
 from base import BaseModel
 from utils import *
@@ -111,10 +110,6 @@ class VGG16(nn.Module):
         conv_fc7_bias = pretrained_state_dict['classifier.3.bias']  # (4096)
         state_dict['conv7.weight'] = decimate(conv_fc7_weight, m=[4, 4, None, None])  # (1024, 1024, 1, 1)
         state_dict['conv7.bias'] = decimate(conv_fc7_bias, m=[4])  # (1024)
-
-        # Note: an FC layer of size (K) operating on a flattened version (C*H*W) of a 2D image of size (C, H, W)...
-        # ...is equivalent to a convolutional layer with kernel size (H, W), input channels C, output channels K...
-        # ...operating on the 2D image of size (C, H, W) without padding
 
         self.load_state_dict(state_dict)
 
@@ -294,7 +289,7 @@ class SSD300(nn.Module):
 
     def detect_objects(self, predicted_locs, predicted_scores, min_score, max_overlap, top_k):
         """
-        (hasn't been rewritten yet)
+        (This function as defined in https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection))
 
         Decipher the 8732 locations and class scores (output of ths SSD300) to detect objects.
         For each class, perform Non-Maximum Suppression (NMS) on boxes that are above a minimum threshold.
@@ -368,14 +363,14 @@ class SSD300(nn.Module):
 
                 # Store only unsuppressed boxes for this class
                 image_boxes.append(class_decoded_locs[1 - suppress])
-                image_labels.append(torch.LongTensor((1 - suppress).sum().item() * [c]))
+                image_labels.append(torch.LongTensor((1 - suppress).sum().item() * [c]).to(DEVICE))
                 image_scores.append(class_scores[1 - suppress])
 
             # If no object in any class is found, store a placeholder for 'background'
             if len(image_boxes) == 0:
-                image_boxes.append(torch.FloatTensor([[0., 0., 1., 1.]]))
-                image_labels.append(torch.LongTensor([0]))
-                image_scores.append(torch.FloatTensor([0.]))
+                image_boxes.append(torch.FloatTensor([[0., 0., 1., 1.]]).to(DEVICE)
+                image_labels.append(torch.LongTensor([0]).to(DEVICE)
+                image_scores.append(torch.FloatTensor([0.]).to(DEVICE)
 
             # Concatenate into single tensors
             image_boxes = torch.cat(image_boxes, dim=0)  # (n_objects, 4)
