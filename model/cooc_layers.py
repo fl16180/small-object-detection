@@ -14,7 +14,7 @@ from constants import *
 class CoocLayer(nn.Module):
     """ Co-occurrence layer as proposed in Shih et al. (CVPR 2017)
     """
-    def __init__(self, in_channels, out_channels=32, offset=5):
+    def __init__(self, in_channels, out_channels=32):
         super().__init__()
 
         # dimensionality reduction
@@ -30,73 +30,83 @@ class CoocLayer(nn.Module):
             The co-occurrence layer computes a vector of length C ** 2
         """
 
-        N, C, H, W = x.size()
+        x = F.relu(self.conv1(x))
         print(x.size())
+
+        x = F.pad(x, (2, 2, 2, 2), mode='reflect')
+        x = self.gaussian(x)
+
+        print(x.size())
+        N, C, H, W = x.size()
+
+        # list of length H*W of (N, C, H, W) tensors containing each offset
+        x_offsets = [self.roll(self.roll(x, i, 2), j, 3) for i in range(H) for j in range(W)]
+        x_offsets = torch.cat(x_offsets, 1).to(DEVICE)   # (N, C*H*W, H, W)
+        x_offsets = torch.view(N, C * H * W, H * W).permute(0, 2, 1)   # (N, H*W, C*H*W)
+
+        x_base = x.view(N, C, H * W)    # (N, C, H*W)
+        corrs = torch.bmm(x_base, x_offsets)    # (N, C, C*H*W)
+        corrs = corrs.view(N, C * C, H * W)
+        c_ij, best_offset = torch.max(corrs, 1)
+
+        return c_ij
+
+    @staticmethod
+    def roll(tensor, shift, axis):
+        """ https://discuss.pytorch.org/t/implementation-of-function-like-numpy-roll/964/6 """
+        if shift == 0:
+            return tensor
+
+        if axis < 0:
+            axis += tensor.dim()
+
+        dim_size = tensor.size(axis)
+        after_start = dim_size - shift
+        if shift < 0:
+            after_start = -shift
+            shift = dim_size - abs(shift)
+
+        before = tensor.narrow(axis, 0, dim_size - shift)
+        after = tensor.narrow(axis, after_start, shift)
+        return torch.cat([after, before], axis)
+
+
+class SpatialCoocLayer(CoocLayer):
+    """ Novel adaptation of co-occurrence layer for spatially localized
+        co-occurrences. Instead of computing global co-occurrences over the
+        entire activations, this returns a spatial activation map of local
+        co-occurrences using pooling operations.
+    """
+    def __init__(self, in_channels, out_channels=32, local_kernel=5):
+        super().__init__(in_channels, out_channels):
+
+        self.avgpool = nn.AvgPool2d(kernel_size=local_kernel, stride=1)
+        self.maxpool = nn.MaxPool2d()
+
+    def forward(self, x):
+
         x = F.relu(self.conv1(x))
 
         x = F.pad(x, (2, 2, 2, 2), mode='reflect')
         x = self.gaussian(x)
-        print(x.size())
-        for pair in product(range(C), repeat=2):
-            Ai = x[N, pair[0], :, :]
-            Aj = x[N, pair[1], :, :]
 
+        N, C, H, W = x.size()
 
+        # list of length H*W of (N, C, H, W) tensors containing each offset
+        x_offsets = [roll(roll(x, i, 2), j, 3) for i in range(H) for j in range(W)]
+        x_offsets = torch.cat(x_offsets, 1).to(DEVICE)   # (N, C*H*W, H, W)
 
+        x_base = x.repeat(1, H * W, 1, 1)       # (N, C*H*W, H, W)
+        spatial_corrs = torch.mm(x, x_offsets)    # (N, C*H*W, H, W)
 
+        self.avgpool(spatial_corrs)
+        self.maxpool(spatial_corrs)
 
-        out = F.relu(self.conv1_1(x))  # (N, 64, 300, 300)
-        out = F.relu(self.conv1_2(out))  # (N, 64, 300, 300)
-        out = self.pool1(out)  # (N, 64, 150, 150)
+        # corrs = corrs.view(N, C * C, H * W)
+        # c_ij, best_offset = torch.max(corrs, 1)
 
-        out = F.relu(self.conv2_1(out))  # (N, 128, 150, 150)
-        out = F.relu(self.conv2_2(out))  # (N, 128, 150, 150)
-        out = self.pool2(out)  # (N, 128, 75, 75)
+        return c_ij
 
-        out = F.relu(self.conv3_1(out))  # (N, 256, 75, 75)
-        out = F.relu(self.conv3_2(out))  # (N, 256, 75, 75)
-        out = F.relu(self.conv3_3(out))  # (N, 256, 75, 75)
-        out = self.pool3(out)  # (N, 256, 38, 38) (note ceil_mode=True)
-
-        out = F.relu(self.conv4_1(out))  # (N, 512, 38, 38)
-        out = F.relu(self.conv4_2(out))  # (N, 512, 38, 38)
-        out = F.relu(self.conv4_3(out))  # (N, 512, 38, 38)
-        conv4_out = out  # (N, 512, 38, 38)
-        out = self.pool4(out)  # (N, 512, 19, 19)
-
-        out = F.relu(self.conv5_1(out))  # (N, 512, 19, 19)
-        out = F.relu(self.conv5_2(out))  # (N, 512, 19, 19)
-        out = F.relu(self.conv5_3(out))  # (N, 512, 19, 19)
-        out = self.pool5(out)  # (N, 512, 19, 19)
-
-        out = F.relu(self.conv6(out))  # (N, 1024, 19, 19)
-
-        conv7_out = F.relu(self.conv7(out))  # (N, 1024, 19, 19)
-
-        return conv4_out, conv7_out
-
-class SpatialCoocLayer(nn.Module):
-    def __init__(self):
-        super().__init__():
-
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
-
-        self.gaussian_filter = nn.Conv2d(out_channels, out_channels,
-                                         kernel_size=3, padding=1,
-                                         groups=out_channels, bias=False)
-        with torch.no_grad():
-            self.gaussian_filter.weight = gaussian_weights
-
-
-        self.avgpool = nn.AvgPool2d()
-        self.maxpool = nn.MaxPool2d()
-
-    def forward(self, ):
-
-        for pair in product(range(C), repeat=2):
-            Ai = x[N, pair[0], :, :]
-            Aj = x[N, pair[1], :, :]
-            Ai * Aj
 
 class GaussianSmoothing(nn.Module):
     """
