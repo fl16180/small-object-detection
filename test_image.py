@@ -56,7 +56,7 @@ def detect(original_image, model, min_score, max_overlap, top_k, suppress=None):
     # Annotate
     annotated_image = original_image
     draw = ImageDraw.Draw(annotated_image)
-    font = ImageFont.truetype("./calibril.ttf", 15)
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 15)
 
     # Suppress specific classes, if needed
     for i in range(det_boxes.size(0)):
@@ -90,13 +90,13 @@ def detect(original_image, model, min_score, max_overlap, top_k, suppress=None):
 def main(args):
 
     image = args.image
-    image = './data/VOCdevkit/VOC2007/JPEGImages/000017.jpg'
+    image = './data/VOCdevkit/VOC2007/JPEGImages/000012.jpg'
     raw_image = Image.open(image, mode='r')
     raw_image = raw_image.convert('RGB')
 
     # Load model checkpoint
     checkpoint = args.model
-    checkpoint = './saved/models/VOC_SSD/0602_050737/checkpoint-epoch98.pth'
+    checkpoint = './saved/models/VOC_SSD/checkpoint-epoch98.pth'
     checkpoint = torch.load(checkpoint)
     state_dict = checkpoint['state_dict']
 
