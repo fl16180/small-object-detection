@@ -3,6 +3,7 @@ from torchvision import transforms
 from PIL import Image, ImageDraw, ImageFont
 from constants import *
 from utils import *
+from model.model import *
 
 
 def detect(original_image, model, min_score, max_overlap, top_k, suppress=None):
@@ -95,14 +96,16 @@ def main(args):
 
     # Load model checkpoint
     checkpoint = args.model
-    checkpoint = './checkpoint-epoch98.pth'
-    checkpoint = torch.load(checkpoint, map_location='cpu')
+    checkpoint = './saved/models/VOC_SSD/0602_050737/checkpoint-epoch98.pth'
+    checkpoint = torch.load(checkpoint)
+    state_dict = checkpoint['state_dict']
 
-    model = checkpoint['model']
-    model = model.to(DEVICE)
-    model.eval()
+    mod = SSD300(n_classes=21)
+    mod.load_state_dict(state_dict)
+    mod = mod.to(DEVICE)
+    mod.eval()
 
-    detect(raw_image, model, min_score=0.2, max_overlap=0.5, top_k=200).show()
+    detect(raw_image, mod, min_score=0.2, max_overlap=0.5, top_k=200).show()
 
 
 if __name__ == '__main__':
