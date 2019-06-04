@@ -404,14 +404,14 @@ class CoClassifiers(Classifiers):
 
         self.box4 = nn.Conv2d(512+256, n_boxes[0] * 4, kernel_size=3, padding=1)
         self.box7 = nn.Conv2d(1024+256, n_boxes[1] * 4, kernel_size=3, padding=1)
-        self.box8 = nn.Conv2d(512+64, n_boxes[2] * 4, kernel_size=3, padding=1)
+        self.box8 = nn.Conv2d(512, n_boxes[2] * 4, kernel_size=3, padding=1)
         self.box9 = nn.Conv2d(256, n_boxes[3] * 4, kernel_size=3, padding=1)
         self.box10 = nn.Conv2d(256, n_boxes[4] * 4, kernel_size=3, padding=1)
         self.box11 = nn.Conv2d(256, n_boxes[5] * 4, kernel_size=3, padding=1)
 
         self.class4 = nn.Conv2d(512+256, n_boxes[0] * n_classes, kernel_size=3, padding=1)
         self.class7 = nn.Conv2d(1024+256, n_boxes[1] * n_classes, kernel_size=3, padding=1)
-        self.class8 = nn.Conv2d(512+64, n_boxes[2] * n_classes, kernel_size=3, padding=1)
+        self.class8 = nn.Conv2d(512, n_boxes[2] * n_classes, kernel_size=3, padding=1)
         self.class9 = nn.Conv2d(256, n_boxes[3] * n_classes, kernel_size=3, padding=1)
         self.class10 = nn.Conv2d(256, n_boxes[4] * n_classes, kernel_size=3, padding=1)
         self.class11 = nn.Conv2d(256, n_boxes[5] * n_classes, kernel_size=3, padding=1)
@@ -428,9 +428,9 @@ class SSCoD(SSD300):
 
         self.classifiers = CoClassifiers(n_classes, n_boxes)
 
-        self.spatialcooc4 = SpatialCoocLayer(in_channels=512, out_channels=16, local_kernel=5)
-        self.spatialcooc7 = SpatialCoocLayer(in_channels=1024, out_channels=16, local_kernel=5)
-        self.spatialcooc8 = SpatialCoocLayer(in_channels=512, out_channels=8, local_kernel=5)
+        self.spatialcooc4 = SpatialCoocLayer(in_channels=512, out_channels=8, local_kernel=5)
+        self.spatialcooc7 = SpatialCoocLayer(in_channels=1024, out_channels=8, local_kernel=5)
+        # self.spatialcooc8 = SpatialCoocLayer(in_channels=512, out_channels=8, local_kernel=5)
 
     def forward(self, image):
        """ Forward propagation.
@@ -449,10 +449,10 @@ class SSCoD(SSD300):
        # run spatial co-occurrence layers and stack with activations
        spatial_corr4 = self.spatialcooc4(conv4_out)
        spatial_corr7 = self.spatialcooc7(conv7_out)
-       spatial_corr8 = self.spatialcooc8(conv8_out)
+       # spatial_corr8 = self.spatialcooc8(conv8_out)
        conv4_out = torch.cat([conv4_out, spatial_corr4], dim=1)
        conv7_out = torch.cat([conv7_out, spatial_corr7], dim=1)
-       conv8_out = torch.cat([conv8_out, spatial_corr8], dim=1)
+       # conv8_out = torch.cat([conv8_out, spatial_corr8], dim=1)
 
        # setup prediction inputs
        features = (conv4_out, conv7_out, conv8_out, conv9_out,
