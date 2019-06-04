@@ -4,9 +4,9 @@ import torch.nn.functional as F
 from torchvision.models import vgg16
 from math import sqrt
 
-from base import BaseModel
 from utils import *
 from constants import *
+from .cooc_layers import SpatialCoocLayer
 
 
 class VGG16(nn.Module):
@@ -368,9 +368,9 @@ class SSD300(nn.Module):
 
             # If no object in any class is found, store a placeholder for 'background'
             if len(image_boxes) == 0:
-                image_boxes.append(torch.FloatTensor([[0., 0., 1., 1.]]).to(DEVICE)
-                image_labels.append(torch.LongTensor([0]).to(DEVICE)
-                image_scores.append(torch.FloatTensor([0.]).to(DEVICE)
+                image_boxes.append(torch.FloatTensor([[0., 0., 1., 1.]]).to(DEVICE))
+                image_labels.append(torch.LongTensor([0]).to(DEVICE))
+                image_scores.append(torch.FloatTensor([0.]).to(DEVICE))
 
             # Concatenate into single tensors
             image_boxes = torch.cat(image_boxes, dim=0)  # (n_objects, 4)
@@ -391,3 +391,74 @@ class SSD300(nn.Module):
             all_images_scores.append(image_scores)
 
         return all_images_boxes, all_images_labels, all_images_scores  # lists of length batch_size
+
+
+class CoClassifiers(Classifiers):
+
+    def __init__(self, n_classes, n_boxes):
+        super(Classifiers, self).__init__()
+
+        self.n_classes = n_classes
+        self.n_boxes = n_boxes
+        assert len(self.n_boxes) == 6
+
+        self.box4 = nn.Conv2d(512+256, n_boxes[0] * 4, kernel_size=3, padding=1)
+        self.box7 = nn.Conv2d(1024+256, n_boxes[1] * 4, kernel_size=3, padding=1)
+        self.box8 = nn.Conv2d(512+64, n_boxes[2] * 4, kernel_size=3, padding=1)
+        self.box9 = nn.Conv2d(256, n_boxes[3] * 4, kernel_size=3, padding=1)
+        self.box10 = nn.Conv2d(256, n_boxes[4] * 4, kernel_size=3, padding=1)
+        self.box11 = nn.Conv2d(256, n_boxes[5] * 4, kernel_size=3, padding=1)
+
+        self.class4 = nn.Conv2d(512+256, n_boxes[0] * n_classes, kernel_size=3, padding=1)
+        self.class7 = nn.Conv2d(1024+256, n_boxes[1] * n_classes, kernel_size=3, padding=1)
+        self.class8 = nn.Conv2d(512+64, n_boxes[2] * n_classes, kernel_size=3, padding=1)
+        self.class9 = nn.Conv2d(256, n_boxes[3] * n_classes, kernel_size=3, padding=1)
+        self.class10 = nn.Conv2d(256, n_boxes[4] * n_classes, kernel_size=3, padding=1)
+        self.class11 = nn.Conv2d(256, n_boxes[5] * n_classes, kernel_size=3, padding=1)
+
+        for layer in self.children():
+            if isinstance(layer, nn.Conv2d):
+                nn.init.xavier_uniform_(layer.weight)
+                nn.init.constant_(layer.bias, 0.)
+
+
+class SSCoD(SSD300):
+    def __init__(self, n_classes=VOC_NUM_CLASSES, n_boxes=(4, 6, 6, 6, 4, 4)):
+        super(SSCoD, self).__init__(n_classes, n_boxes)
+
+        self.classifiers = CoClassifiers(n_classes, n_boxes)
+
+        self.spatialcooc4 = SpatialCoocLayer(in_channels=512, out_channels=16, local_kernel=5)
+        self.spatialcooc7 = SpatialCoocLayer(in_channels=1024, out_channels=16, local_kernel=5)
+        self.spatialcooc8 = SpatialCoocLayer(in_channels=512, out_channels=8, local_kernel=5)
+
+    def forward(self, image):
+       """ Forward propagation.
+
+           Input: images forming tensor of dimensions (N, 3, 300, 300)
+
+           Returns: 8732 locations and class scores for each image.
+       """
+       # Run VGG16
+       conv4_out, conv7_out = self.base(image)  # (N, 512, 38, 38), (N, 1024, 19, 19)
+       conv4_out = self.L2Norm(conv4_out)
+
+       # Run ExtraLayers
+       conv8_out, conv9_out, conv10_out, conv11_out = self.extra(conv7_out)  # (N, 512, 10, 10),  (N, 256, 5, 5), (N, 256, 3, 3), (N, 256, 1, 1)
+
+       # run spatial co-occurrence layers and stack with activations
+       spatial_corr4 = self.spatialcooc4(conv4_out)
+       spatial_corr7 = self.spatialcooc7(conv7_out)
+       spatial_corr8 = self.spatialcooc8(conv8_out)
+       conv4_out = torch.cat([conv4_out, spatial_corr4], dim=1)
+       conv7_out = torch.cat([conv7_out, spatial_corr7], dim=1)
+       conv8_out = torch.cat([conv8_out, spatial_corr8], dim=1)
+
+       # setup prediction inputs
+       features = (conv4_out, conv7_out, conv8_out, conv9_out,
+                   conv10_out, conv11_out)
+
+       # Run Classifiers
+       output_boxes, output_scores = self.classifiers(features)
+
+       return output_boxes, output_scores

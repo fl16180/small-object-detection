@@ -1,11 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from math import sqrt
-from itertools import product
-from scipy.ndimage.filters import gaussian_filter
+import math
+import numbers
 
-from base import BaseModel
 from utils import *
 from constants import *
 
@@ -31,12 +29,10 @@ class CoocLayer(nn.Module):
         """
 
         x = F.relu(self.conv1(x))
-        print(x.size())
 
         x = F.pad(x, (2, 2, 2, 2), mode='reflect')
         x = self.gaussian(x)
 
-        print(x.size())
         N, C, H, W = x.size()
 
         # list of length H*W of (N, C, H, W) tensors containing each offset
@@ -46,8 +42,8 @@ class CoocLayer(nn.Module):
 
         x_base = x.view(N, C, H * W)    # (N, C, H*W)
         corrs = torch.bmm(x_base, x_offsets)    # (N, C, C*H*W)
-        corrs = corrs.view(N, C * C, H * W)
-        c_ij, best_offset = torch.max(corrs, 1)
+        corrs = corrs.view(N, C * C, H * W).permute(0, 2, 1)
+        c_ij, best_offset = torch.max(corrs, 1)         # (N, C*C)
 
         return c_ij
 
@@ -78,10 +74,11 @@ class SpatialCoocLayer(CoocLayer):
         co-occurrences using pooling operations.
     """
     def __init__(self, in_channels, out_channels=32, local_kernel=5):
-        super().__init__(in_channels, out_channels):
+        super().__init__(in_channels, out_channels)
 
-        self.avgpool = nn.AvgPool2d(kernel_size=local_kernel, stride=1)
-        self.maxpool = nn.MaxPool2d()
+        same_pad = (local_kernel - 1) // 2
+        self.avgpool = nn.AvgPool2d(kernel_size=local_kernel, stride=1,
+                                    padding=same_pad)
 
     def forward(self, x):
 
@@ -93,18 +90,21 @@ class SpatialCoocLayer(CoocLayer):
         N, C, H, W = x.size()
 
         # list of length H*W of (N, C, H, W) tensors containing each offset
-        x_offsets = [roll(roll(x, i, 2), j, 3) for i in range(H) for j in range(W)]
+        x_offsets = [self.roll(self.roll(x, i, 2), j, 3) for i in range(H) for j in range(W)]
         x_offsets = torch.cat(x_offsets, 1).to(DEVICE)   # (N, C*H*W, H, W)
 
-        x_base = x.repeat(1, H * W, 1, 1)       # (N, C*H*W, H, W)
-        spatial_corrs = torch.mm(x, x_offsets)    # (N, C*H*W, H, W)
+        all_channels = []
+        for c in range(C):
+            x_channel = x[:, c, :, :].unsqueeze(1)                     # (N, C*H*W, H, W)
+            channel_pairs = torch.mul(x_channel, x_offsets)    # (N, C*H*W, H, W)
+            channel_pairs = channel_pairs.view(N * C, H * W, H, W)
 
-        self.avgpool(spatial_corrs)
-        self.maxpool(spatial_corrs)
+            local_corrs = self.avgpool(channel_pairs)   # (N*C, H*W, H, W)
 
-        # corrs = corrs.view(N, C * C, H * W)
-        # c_ij, best_offset = torch.max(corrs, 1)
+            max_corrs_over_offsets, _ = torch.max(local_corrs, dim=1)      # (N*C, 1, H, W)
+            all_channels.append(max_corrs_over_offsets.view(N, C, H, W))
 
+        c_ij = torch.cat(all_channels, dim=1)        # (N, C*C, H, W)
         return c_ij
 
 
