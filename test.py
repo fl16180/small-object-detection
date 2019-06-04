@@ -11,15 +11,7 @@ from parse_config import ConfigParser
 def main(config, resume):
     logger = config.get_logger('test')
 
-    # setup data_loader instances
-    data_loader = getattr(module_data, config['data_loader']['type'])(
-        config['data_loader']['args']['data_dir'],
-        batch_size=8,
-        shuffle=False,
-        validation_split=0.0,
-        training=False,
-        num_workers=2
-    )
+    data_loader = config.initialize('data_loader', module_data, mode='test')
 
     # build model architecture
     model = config.initialize('arch', module_arch)
@@ -32,8 +24,7 @@ def main(config, resume):
     logger.info('Loading checkpoint: {} ...'.format(resume))
     checkpoint = torch.load(resume)
     state_dict = checkpoint['state_dict']
-    if config['n_gpu'] > 1:
-        model = torch.nn.DataParallel(model)
+
     model.load_state_dict(state_dict)
 
     # prepare model for testing
@@ -45,20 +36,21 @@ def main(config, resume):
     total_metrics = torch.zeros(len(metric_fns))
 
     with torch.no_grad():
-        for i, (data, target) in enumerate(tqdm(data_loader)):
-            data, target = data.to(device), target.to(device)
-            output = model(data)
+        for batch_idx, (data, boxes, labels, _) in enumerate(test_data_loader):
 
-            #
-            # save sample images, or do something with output here
-            #
+            data = data.to(DEVICE)
+            boxes = [b.to(DEVICE) for b in boxes]
+            labels = [l.to(DEVICE) for l in labels]
+
+            output_boxes, output_scores = self.model(data)
+
+            mbloss = loss_fn(threshold=0.5, neg_pos_ratio=3,
+                                     alpha=1., device=device)
+            loss = mbloss(output_boxes, output_scores, boxes, labels)
 
             # computing loss, metrics on test set
-            loss = loss_fn(output, target)
             batch_size = data.shape[0]
             total_loss += loss.item() * batch_size
-            for i, metric in enumerate(metric_fns):
-                total_metrics[i] += metric(output, target) * batch_size
 
     n_samples = len(data_loader.sampler)
     log = {'loss': total_loss / n_samples}

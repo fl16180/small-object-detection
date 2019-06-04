@@ -1,3 +1,7 @@
+""" helper utilities adapted from
+https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection
+"""
+
 import torch
 from math import sqrt
 
