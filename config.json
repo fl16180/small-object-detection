@@ -10,7 +10,7 @@
         "args":{
             "data_dir": "./data/",
             "image_size": 300,
-            "batch_size": 1,
+            "batch_size": 8,
             "shuffle": true,
             "validation_split": 0.0,
             "num_workers": 1,
