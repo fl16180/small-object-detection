@@ -88,26 +88,16 @@ class SSDLoss(nn.Module):
         L_conf_hard_neg = L_conf_neg[hard_negatives]
 
         # As in the paper, averaged over positive priors only, although computed over both positive and hard-negative priors
-        print(n_positives)
-        print(n_positives.sum())
         L_conf = (L_conf_hard_neg.sum() + L_conf_pos.sum()) / n_positives.sum().float()  # (), scalar
 
         loss = L_conf + self.alpha * L_loc
         return loss
 
 
-"""
-Reference implementation of MultiBoxLoss at:
-
-https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection/blob/master/model.py
-
-Computing it requires helper functions to generate prior boxes, compute
-non-max suppression, and a few other things. Will need to (re-)implement these as well.
-
-"""
-
 class MultiBoxLoss(nn.Module):
     """
+    https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection/blob/master/model.py
+
     The MultiBox loss, a loss function for object detection.
     This is a combination of:
     (1) a localization loss for the predicted locations of the boxes, and
