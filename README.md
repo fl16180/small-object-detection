@@ -7,7 +7,7 @@ Authors: Fred Lu, Samir Sen, Meera Srinivasan
 ## Overview
 Experiments with different models for object detection on the Pascal VOC 2007 dataset.
 
-See model/ directory for models: SSD300, SSCoD, Faster R-CNN+GAN.
+See model/ directory for models: SSD300 and SSCoD
 
 Our implementation of the novel spatial co-occurrence layer is in model/cooc_layers.py
 
@@ -30,3 +30,8 @@ python train.py -r saved/models/path-to-checkpoint.pth
 
 Remaining scripts in root directory are self-explanatory, e.g. evaluation and producing images with bounding boxes.
 
+
+## Acknowledgements
+The following repos were essential to our work: 
+<https://github.com/victoresque/pytorch-template>
+<https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection>
