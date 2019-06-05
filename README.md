@@ -1,5 +1,7 @@
 # small-object-detection
+
 CS231n project
+
 Authors: Fred Lu, Samir Sen, Meera Srinivasan
 
 ## Overview
