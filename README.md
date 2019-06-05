@@ -5,9 +5,9 @@ Authors: Fred Lu, Samir Sen, Meera Srinivasan
 ## Overview
 Experiments with different models for object detection on the Pascal VOC 2007 dataset.
 
-See models/ directory for models: SSD300, SSCoD, Faster R-CNN+GAN.
+See model/ directory for models: SSD300, SSCoD, Faster R-CNN+GAN.
 
-Our implementation of the novel spatial co-occurrence layer is in models/cooc_layers.py
+Our implementation of the novel spatial co-occurrence layer is in model/cooc_layers.py
 
 
 ### Requirements
