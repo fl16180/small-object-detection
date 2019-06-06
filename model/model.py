@@ -394,7 +394,7 @@ class SSD300(nn.Module):
 
 
 class CoClassifiers(Classifiers):
-
+    """ Modifed classifier convolutions for SSCoD due to extra features """
     def __init__(self, n_classes, n_boxes):
         super(Classifiers, self).__init__()
 
@@ -430,7 +430,7 @@ class SSCoD(SSD300):
 
         self.spatialcooc4 = SpatialCoocLayer(in_channels=512, out_channels=8, local_kernel=5)
         self.spatialcooc7 = SpatialCoocLayer(in_channels=1024, out_channels=8, local_kernel=5)
-        # self.spatialcooc8 = SpatialCoocLayer(in_channels=512, out_channels=8, local_kernel=5)
+        self.spatialcooc8 = SpatialCoocLayer(in_channels=512, out_channels=8, local_kernel=5)
 
     def forward(self, image):
        """ Forward propagation.
@@ -449,10 +449,10 @@ class SSCoD(SSD300):
        # run spatial co-occurrence layers and stack with activations
        spatial_corr4 = self.spatialcooc4(conv4_out)
        spatial_corr7 = self.spatialcooc7(conv7_out)
-       # spatial_corr8 = self.spatialcooc8(conv8_out)
+       spatial_corr8 = self.spatialcooc8(conv8_out)
        conv4_out = torch.cat([conv4_out, spatial_corr4], dim=1)
        conv7_out = torch.cat([conv7_out, spatial_corr7], dim=1)
-       # conv8_out = torch.cat([conv8_out, spatial_corr8], dim=1)
+       conv8_out = torch.cat([conv8_out, spatial_corr8], dim=1)
 
        # setup prediction inputs
        features = (conv4_out, conv7_out, conv8_out, conv9_out,
