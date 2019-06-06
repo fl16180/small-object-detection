@@ -35,3 +35,7 @@ Remaining scripts in root directory are self-explanatory, e.g. evaluation and pr
 The following repos were essential to our work: 
 <https://github.com/victoresque/pytorch-template>
 <https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection>
+
+The basic project backbone (loggers, model saving, base classes) was adapted from the first repo. I wrote the data loading and preprocessing by subclassing PyTorch modules. Some helper functions were closely adapted from the tutorial in the second link. It also guided me in writing the models and loss modules. The SSCoD model was written from scratch with help from useful PyTorch forum posts with utility functions.
+
+
