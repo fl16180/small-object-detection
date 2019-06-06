@@ -28,7 +28,12 @@ Model checkpoints are automatically saved. Resume training with
 python train.py -r saved/models/path-to-checkpoint.pth
 ```
 
-Remaining scripts in root directory are self-explanatory, e.g. evaluation and producing images with bounding boxes.
+After training, a selected model can be used for testing with e.g.
+```
+python test.py -r saved/models/path-to-checkpoint.pth
+```
+
+Remaining scripts in root directory are self-explanatory, e.g. producing images with bounding boxes.
 
 
 ## Acknowledgements
