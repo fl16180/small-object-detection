@@ -1,13 +1,13 @@
 # small-object-detection
 
-CS231n project
+CS231n project, Spring 2019
 
 ## Overview
 Experiments with different models for object detection on the Pascal VOC 2007 dataset.
 
 See model/ directory for models: SSD300 and SSCoD. See <https://github.com/samirsen/small-object-detection/> for Faster R-CNN+GAN
 
-The implementation of the novel spatial co-occurrence layer is in model/cooc_layers.py
+The implementation of the novel spatial co-occurrence layer is in model/cooc_layers.py. This is an extension of the convolutional co-occurrence layer from Shih et al. 2017 (CVPR) for generating local spatial cross-correlation signals. 
 
 
 ### Requirements
