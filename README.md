@@ -2,8 +2,6 @@
 
 CS231n project
 
-Authors: Fred Lu, Samir Sen, Meera Srinivasan
-
 ## Overview
 Experiments with different models for object detection on the Pascal VOC 2007 dataset.
 
